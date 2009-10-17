@@ -1,0 +1,162 @@
+<html>
+<head>
+<title>Bezier sample#1</title>
+<style type="text/css">
+@import "../lib/jquery.svg/jquery.svg.css";
+
+#svg1 { width: 1000px; height: 800px; border: 1px solid #000; }
+</style>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.js"></script>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.svg.js"></script>
+<script type="text/javascript" src="../src/numeric.js"></script>
+<script type="text/javascript" src="../src/geom2d.js"></script>
+<script type="text/javascript">
+$(function() {
+  $.svg.addExtension('bezier', SVGBezier);
+
+  function SVGBezier(wrapper) {
+    this._wrapper = wrapper;
+  }
+  $.extend(SVGBezier.prototype, {
+    CONTROL_RECT_SIZE: 8,
+    CONTROL_LINE_OPACITY: 0.5,
+    bezierC: function(points, settings) {
+      var wrapper = this._wrapper;
+      var path = wrapper.createPath().
+        move(points[0][0], points[0][1]).
+        curveC(points[1][0], points[1][1], points[2][0], points[2][1],
+          points[3][0], points[3][1]);
+      var g = wrapper.group();
+      var controlStroke = settings.controlStroke;
+      delete settings['controlStroke'];
+      var pathElem = wrapper.path(g, path, settings);
+
+      var bezier = new geom2d.Bezier(numeric.Vector.fromArray2d(points));
+      var cp = bezier.derivativeCoefficients();
+      var xEqn = new numeric.QuadraticEquation(cp[2].x(), cp[1].x(), cp[0].x());
+      var xRoots = xEqn.realRoots();
+console.log('xRoots=' + xRoots.join(', '));
+      var yEqn = new numeric.QuadraticEquation(cp[2].y(), cp[1].y(), cp[0].y());
+      var yRoots = yEqn.realRoots();
+console.log('yRoots=' + yRoots.join(', '));
+      var ts = numeric.uniq(xRoots.concat(yRoots));
+      for (var i = 0, n = ts.length; i < n; ++i) {
+        var t = ts[i];
+console.log('t=' + t);
+        var pt = bezier.pointAtT(t);
+        var rectSize = this.CONTROL_RECT_SIZE;
+        var rect = wrapper.rect(g, pt.x() - rectSize / 2, pt.y() - rectSize / 2,
+          rectSize, rectSize,
+          {fill: 'none', stroke: '#000'});
+      }
+
+      if (controlStroke) {
+        var opacity = this.CONTROL_LINE_OPACITY;
+        var polyline = wrapper.polyline(g, points,
+          {fill: 'none', stroke: controlStroke, opacity: opacity});
+
+        var rectSize = this.CONTROL_RECT_SIZE;
+        $.each(points, function(i) {
+          var x = this[0], y = this[1];
+          var rect = wrapper.rect(g, x - rectSize / 2, y - rectSize / 2,
+            rectSize, rectSize,
+            {fill: '#fff', stroke: controlStroke, opacity: opacity});
+          (function() {
+            var dragging, xOff, yOff, pageX0, pageY0;
+
+            $(rect).
+            bind('mouseover', function() {
+              $(this).attr({opacity: 1, 'stroke-width': 2});
+            }).
+            bind('mouseout', function() {
+              $(this).attr({opacity: opacity, 'stroke-width': 1});
+            }).
+            bind('mousedown', function(e) {
+              $(this).attr({'stroke-width': 4});
+              dragging = true;
+              pageX0 = e.pageX;
+              pageY0 = e.pageY;
+              xOff = rect.x.baseVal.value + rectSize / 2 - e.pageX;
+              yOff = rect.y.baseVal.value + rectSize / 2 - e.pageY;
+              var pathSeg = pathElem.pathSegList.getItem(i === 0 ? 0 : 1);
+            }).
+            bind('mousemove', function(e) {
+              if (!dragging) return;
+              var xNow = e.pageX + xOff;
+              var yNow = e.pageY + yOff;
+              rect.x.baseVal.value = xNow - rectSize / 2;
+              rect.y.baseVal.value = yNow - rectSize / 2;
+              wrapper.change(rect, {
+                opacity: 1, 'stroke-width': 2
+              });
+
+              var polylinePt = polyline.points.getItem(i);
+              polylinePt.x = xNow;
+              polylinePt.y = yNow;
+
+              var pathSegIndex = i === 0 ? 0 : 1;
+              var oldPathSeg = pathElem.pathSegList.getItem(pathSegIndex);
+              var newPathSeg;
+              switch (i) {
+              case 0:
+                newPathSeg = pathElem.createSVGPathSegMovetoAbs(xNow, yNow);
+                break;
+              case 1:
+                newPathSeg = pathElem.createSVGPathSegCurvetoCubicAbs(
+                  oldPathSeg.x, oldPathSeg.y, xNow, yNow,
+                  oldPathSeg.x2, oldPathSeg.y2);
+                break;
+              case 2:
+                newPathSeg = pathElem.createSVGPathSegCurvetoCubicAbs(
+                  oldPathSeg.x, oldPathSeg.y, oldPathSeg.x1, oldPathSeg.y1,
+                  xNow, yNow);
+                break;
+              case 3:
+                newPathSeg = pathElem.createSVGPathSegCurvetoCubicAbs(
+                  xNow, yNow, oldPathSeg.x1, oldPathSeg.y1,
+                  oldPathSeg.x2, oldPathSeg.y2);
+                break;
+              }
+              pathElem.pathSegList.replaceItem(newPathSeg, pathSegIndex);
+            }).
+            bind('mouseup', function() {
+              $(this).attr({'stroke-width': 2});
+              dragging = false;
+            });
+          })();
+        });
+      }
+      return g;
+    }
+  });
+
+  function drawInitial(svg) {
+    var cp1 = [[300, 200], [1000, 500], [0, 500], [600, 200]],
+        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]],
+        bezier1 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp1)),
+        bezier2 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp2));
+    svg.bezier.bezierC(cp1,
+       {fill: 'none', stroke: '#000', controlStroke: '#0f0'});
+    svg.bezier.bezierC(cp2,
+       {fill: 'none', stroke: '#000', controlStroke: '#dd0'});
+    geom2d.Bezier.intersections(bezier1, bezier2);
+  }
+
+  function bezierC(svg, p, controlStroke) {
+    var path = svg.createPath().
+      move(p[0][0], p[0][1]).
+      curveC(p[1][0], p[1][1], p[2][0], p[2][1], p[3][0], p[3][1]);
+    svg.path(path, {fill: 'none', stroke: '#000'});
+    if (controlStroke)
+      svg.polyline(p, {fill: 'none', stroke: controlStroke});
+  }
+
+	$('#svg1').svg({onLoad: drawInitial});
+});
+</script>
+</head>
+<body>
+<h1>Bezier sample#1</h1>
+<div id="svg1"></div>
+</body>
+</html>
