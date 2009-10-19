@@ -901,6 +901,14 @@ function uniq(array) {
   return ret;
 }
 
+function uniqAndSort(array) {
+  array = uniq(array);
+  array.sort(function(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  return array;
+}
+
 function log() {
   if (console && console.log)
     console.log.apply(console, arguments);
@@ -913,6 +921,7 @@ return {
   numberEquals: numberEquals,
   sum: sum,
   uniq: uniq,
+  uniqAndSort: uniqAndSort,
   integral: integral,
   sortBy: sortBy,
   QuadraticEquation: QuadraticEquation,

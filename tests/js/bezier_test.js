@@ -5,8 +5,8 @@ function testBezier() {
   test('bezier polynominal', function() {
     var cp1 = [[300, 200], [1000, 500], [0, 500], [600, 200]],
         bezier1 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp1));
-    ok(bezier1.pointAtT(0).equals(new numeric.Vector(cp1[0])), 'start point');
-    ok(bezier1.pointAtT(1).equals(new numeric.Vector(cp1[3])), 'end point');
+    ok(bezier1.pointAtT(0).equals(geom2d.Point.fromVector(new numeric.Vector(cp1[0]))), 'start point');
+    ok(bezier1.pointAtT(1).equals(geom2d.Point.fromVector(new numeric.Vector(cp1[3]))), 'end point');
 //console.log('bezier1.pointAtT2(0.5)=' + bezier1.pointAtT2(0.5));
     ok(bezier1.pointAtT2(0.5).equals(bezier1.pointAtT(0.5)), 'point at t = 0.5');
 //console.log('t=' + 0.3 + ', pointAtT2=' + bezier1.pointAtT2(0.3) + ', pointAtT=' + bezier1.pointAtT(0.3));

@@ -130,10 +130,11 @@ function testNumeric() {
         ok(gje.isSingular(), 'expected to be singular.');
       else {
         vectorX = gje.solution();
-//numeric.log('a=' + gje.matrixA.toString());
-//numeric.log('b=' + gje.vectorB.toString());
-//numeric.log('x=' + vectorX.toString());
+numeric.log('a=' + gje.matrixA);
+numeric.log('x=' + vectorX);
+numeric.log('b=' + gje.vectorB);
         vectorB2 = matrixA.multiply(vectorX);
+numeric.log('b2=' + vectorB2);
         ok(vectorB.equals(vectorB2), 'make sure the solution is correct.');
       }
     }

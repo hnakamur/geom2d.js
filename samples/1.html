@@ -31,24 +31,13 @@ $(function() {
       delete settings['controlStroke'];
       var pathElem = wrapper.path(g, path, settings);
 
-      var bezier = new geom2d.Bezier(numeric.Vector.fromArray2d(points));
-      var cp = bezier.derivativeCoefficients();
-      var xEqn = new numeric.QuadraticEquation(cp[2].x(), cp[1].x(), cp[0].x());
-      var xRoots = xEqn.realRoots();
-console.log('xRoots=' + xRoots.join(', '));
-      var yEqn = new numeric.QuadraticEquation(cp[2].y(), cp[1].y(), cp[0].y());
-      var yRoots = yEqn.realRoots();
-console.log('yRoots=' + yRoots.join(', '));
-      var ts = numeric.uniq(xRoots.concat(yRoots));
-      for (var i = 0, n = ts.length; i < n; ++i) {
-        var t = ts[i];
-console.log('t=' + t);
-        var pt = bezier.pointAtT(t);
-        var rectSize = this.CONTROL_RECT_SIZE;
-        var rect = wrapper.rect(g, pt.x() - rectSize / 2, pt.y() - rectSize / 2,
-          rectSize, rectSize,
-          {fill: 'none', stroke: '#000'});
-      }
+//      var bezier = new geom2d.Bezier(numeric.Vector.fromArray2d(points));
+//      var segments = bezier.segmentsDevidedByZeroXYDerivPoints();
+//      for (var i = 0, n = segments.length; i < n; ++i) {
+//        var segment = segments[i], box = segment.box;
+//        var rect = wrapper.rect(g, box.x, box.y, box.width, box.height,
+//          {fill: settings.stroke, opacity: 0.1, stroke: '#000'});
+//      }
 
       if (controlStroke) {
         var opacity = this.CONTROL_LINE_OPACITY;
@@ -132,23 +121,51 @@ console.log('t=' + t);
 
   function drawInitial(svg) {
     var cp1 = [[300, 200], [1000, 500], [0, 500], [600, 200]],
-        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]],
-        bezier1 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp1)),
-        bezier2 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp2));
-    svg.bezier.bezierC(cp1,
-       {fill: 'none', stroke: '#000', controlStroke: '#0f0'});
-    svg.bezier.bezierC(cp2,
-       {fill: 'none', stroke: '#000', controlStroke: '#dd0'});
-    geom2d.Bezier.intersections(bezier1, bezier2);
-  }
+        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
+//    var cp1 = [[300, 400], [500, 600], [600, 500], [640, 480]],
+//        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
+    var bezierC1 = svg.bezier.bezierC(cp1,
+         {fill: 'none', stroke: '#0f0', boxStroke: '#0f0'}),
+        bezierC2 = svg.bezier.bezierC(cp2,
+         {fill: 'none', stroke: '#dd0', boxStroke: '#dd0'});
 
-  function bezierC(svg, p, controlStroke) {
-    var path = svg.createPath().
-      move(p[0][0], p[0][1]).
-      curveC(p[1][0], p[1][1], p[2][0], p[2][1], p[3][0], p[3][1]);
-    svg.path(path, {fill: 'none', stroke: '#000'});
-    if (controlStroke)
-      svg.polyline(p, {fill: 'none', stroke: controlStroke});
+    var bezier1 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp1)),
+        bezier2 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp2));
+
+//    var points = geom2d.Bezier.intersections(bezier1, bezier2);
+//    for (var i = 0, n = points.length; i < n; ++i) {
+//      var point = points[i];
+//      svg.circle(bezierC1, point.x, point.y, 1, {fill: 'none', stroke: '#f00', 'stroke-width': 1});
+//    }
+
+    var segmentPairs = geom2d.Bezier.intersectionSegmentPairs(bezier1, bezier2);
+    console.log(segmentPairs);
+    console.log('pairCount=' + segmentPairs.length);
+
+    for (var i = 0, n = segmentPairs.length; i < n; ++i) {
+      var segmentPair = segmentPairs[i];
+      var segment1 = segmentPair[0], box1 = segment1.box;
+      var segment2 = segmentPair[1], box2 = segment2.box;
+      var rect1 = svg.rect(bezierC1, box1.x, box1.y, box1.width, box1.height,
+        {fill: '#0f0', opacity: 0.1, stroke: '#000'});
+      var rect2 = svg.rect(bezierC2, box2.x, box2.y, box2.width, box2.height,
+        {fill: '#dd0', opacity: 0.1, stroke: '#000'});
+
+      var line1 = new geom2d.Line(segment1.pStart.x, segment1.pStart.y,
+        segment1.pEnd.x, segment1.pEnd.y);
+      var line2 = new geom2d.Line(segment2.pStart.x, segment2.pStart.y,
+        segment2.pEnd.x, segment2.pEnd.y);
+      var lineElem1 = svg.line(bezierC1, segment1.pStart.x, segment1.pStart.y,
+        segment1.pEnd.x, segment1.pEnd.y, {fill: 'none', stroke: '#00f'});
+      var lineElem2 = svg.line(bezierC2, segment2.pStart.x, segment2.pStart.y,
+        segment2.pEnd.x, segment2.pEnd.y, {fill: 'none', stroke: '#f0f'});
+      var point = geom2d.Line.intersection(line1, line2);
+console.log('point');
+console.log(point);
+      if (point) {
+        var pointElem = svg.circle(bezierC2, point.x, point.y, 1, {fill: 'none', stroke: '#f00', 'stroke-width': 1});
+      }
+    }
   }
 
 	$('#svg1').svg({onLoad: drawInitial});
