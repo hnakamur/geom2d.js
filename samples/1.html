@@ -120,23 +120,26 @@ $(function() {
   });
 
   function drawInitial(svg) {
-    var cp1 = [[300, 200], [1000, 500], [0, 500], [600, 200]],
-        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
-//    var cp1 = [[300, 400], [500, 600], [600, 500], [640, 480]],
+//    var cp1 = [[300, 200], [1000, 500], [0, 500], [600, 200]],
 //        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
+    var cp1 = [[300, 400], [500, 600], [600, 500], [640, 480]],
+        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
     var bezierC1 = svg.bezier.bezierC(cp1,
          {fill: 'none', stroke: '#0f0', boxStroke: '#0f0'}),
         bezierC2 = svg.bezier.bezierC(cp2,
          {fill: 'none', stroke: '#dd0', boxStroke: '#dd0'});
 
-    var bezier1 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp1)),
-        bezier2 = new geom2d.Bezier(numeric.Vector.fromArray2d(cp2));
+    var bezier1 = new geom2d.Bezier(geom2d.Vector2d.vectorsFromNestedXYArray(cp1)),
+        bezier2 = new geom2d.Bezier(geom2d.Vector2d.vectorsFromNestedXYArray(cp2));
 
-//    var points = geom2d.Bezier.intersections(bezier1, bezier2);
-//    for (var i = 0, n = points.length; i < n; ++i) {
-//      var point = points[i];
-//      svg.circle(bezierC1, point.x, point.y, 1, {fill: 'none', stroke: '#f00', 'stroke-width': 1});
-//    }
+if (true) {
+    var points = geom2d.Bezier.intersections(bezier1, bezier2, 2);
+    for (var i = 0, n = points.length; i < n; ++i) {
+      var point = points[i];
+      svg.circle(bezierC1, point.x, point.y, 1, {fill: 'none', stroke: '#f00', 'stroke-width': 1});
+    }
+}
+else {
 
     var segmentPairs = geom2d.Bezier.intersectionSegmentPairs(bezier1, bezier2);
     console.log(segmentPairs);
@@ -166,6 +169,7 @@ console.log(point);
         var pointElem = svg.circle(bezierC2, point.x, point.y, 1, {fill: 'none', stroke: '#f00', 'stroke-width': 1});
       }
     }
+}
   }
 
 	$('#svg1').svg({onLoad: drawInitial});

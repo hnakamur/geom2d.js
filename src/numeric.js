@@ -19,8 +19,9 @@ proto.valueAt = function(x) {
 proto.derivAt = function(x) {
   return 2 * this.a * x + this.b;
 };
-proto.realRoots = function() {
+proto.realRoots = function(predicate) {
   // http://en.wikipedia.org/wiki/Quadratic_equation
+  var roots;
   if (this.a) {
     var dis = this.discriminant();
 //log('a=' + this.a + ', b=' + this.b + ', c=' + this.c + ', dis=' + dis);
@@ -35,17 +36,19 @@ proto.realRoots = function() {
 //log('x1=' + x1 + ', x2=' + x2);
       //x1 = -0.5 * (b + Math.sqrt(dis));
       //x2 = -0.5 * (b - Math.sqrt(dis));
-      return x1 < x2 ? [x1, x2] : [x2, x1];
+      roots = x1 < x2 ? [x1, x2] : [x2, x1];
     }
     else if (dis === 0)
-      return [-0.5 * this.b / this.a];
+      roots = [-0.5 * this.b / this.a];
     else
-      return [];
+      roots = [];
   }
   else if (this.b)
-    return [-this.c / this.b];
+    roots = [-this.c / this.b];
   else
-    return [];
+    roots = [];
+
+  return predicate ? filterValues(roots, predicate) : roots;
 };
 proto.discriminant = function() {
   return this.b * this.b - 4 * this.a * this.c;
@@ -476,6 +479,47 @@ proto.swapComponents = function(i, j) {
 proto.toString = function() {
   return '[' + this.components.join(' ') + ']';
 };
+
+// immutable three dimensional vector.
+function Vector3d(x, y, z) {
+  this.x = x;
+  this.y = y;
+  this.z = z;
+}
+Vector3d.sum = function(vectors) {
+  var xs = [], ys = [], zs = [], n = vectors.length, i, v;
+  for (i = 0; i < n; ++i) {
+    v = vectors[i];
+    xs.push(v.x);
+    ys.push(v.y);
+    zs.push(v.z);
+  }
+  return new Vector3d(sum(xs), sum(ys), sum(zs));
+};
+proto = Vector3d.prototype;
+proto.length = function() {
+  return Math.sqrt(this.dotProduct(this));
+};
+proto.dotProduct = function(vector) {
+  return sum([this.x * vector.x, this.y * vector.y, this.z * vector.z]);
+};
+proto.crossProduct = function(vector) {
+  return new Vector3d(
+    this.y * vector.z - this.z * vector.y,
+    this.z * vector.x - this.x * vector.z,
+    this.x * vector.y - this.y * vector.x
+  );
+};
+proto.negate = function() {
+  return new Vector3d(-this.x, -this.y, -this.z);
+};
+proto.scalarMult = function(factor) {
+  return new Vector3d(this.x * factor, this.y * factor, this.z * factor);
+};
+proto.scalarDiv = function(factor) {
+  return new Vector3d(this.x / factor, this.y / factor, this.z / factor);
+};
+
 
 function Matrix() {
   var rowSize, columnSize, elements;
@@ -909,6 +953,20 @@ function uniqAndSort(array) {
   return array;
 }
 
+function filterValues(values, predicate) {
+  if (values) {
+    var ret = [], value;
+    for (var i = 0, n = values.length; i < n; ++i) {
+      value = values[i];
+      if (predicate(value))
+        ret.push(value);
+    }
+    return ret;
+  }
+  else
+    return values;
+}
+
 function log() {
   if (console && console.log)
     console.log.apply(console, arguments);
@@ -922,11 +980,13 @@ return {
   sum: sum,
   uniq: uniq,
   uniqAndSort: uniqAndSort,
+  filterValues: filterValues,
   integral: integral,
   sortBy: sortBy,
   QuadraticEquation: QuadraticEquation,
   Polynomial: Polynomial,
   Vector: Vector,
+  Vector3d: Vector3d,
   Matrix: Matrix,
   GaussElimination: GaussElimination,
   LUDecomposition: LUDecomposition

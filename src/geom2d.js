@@ -1,42 +1,171 @@
 var geom2d = function() {
 
-function Point(x, y) {
+var sum = numeric.sum, numberEquals = numeric.numberEquals,
+    QuadraticEquation = numeric.QuadraticEquation;
+
+// immutable two dimensional vector.
+function Vector2d(x, y) {
   this.x = x;
   this.y = y;
 }
-Point.fromVector = function(vector) {
-  return new Point(vector.x(), vector.y());
+Vector2d.ZERO = new Vector2d(0, 0);
+Vector2d.vectorsFromNestedXYArray = function(xyArray) {
+  var vectors = [], n = xyArray.length, i, xy;
+  for (i = 0; i < n; ++i) {
+    xy = xyArray[i];
+    vectors.push(new Vector2d(xy[0], xy[1]));
+  }
+  return vectors;
 };
-var proto = Point.prototype;
-proto.equals = function(point, epsilon) {
-  return numeric.numberEquals(this.x, point.x, epsilon) &&
-    numeric.numberEquals(this.y, point.y, epsilon);
+Vector2d.sum = function(vectors) {
+  var xs = [], ys = [], n = vectors.length, i, v;
+  for (i = 0; i < n; ++i) {
+    v = vectors[i];
+    xs.push(v.x);
+    ys.push(v.y);
+  }
+  return new Vector2d(sum(xs), sum(ys));
+};
+Vector2d.polynomial = function(t, coefficients) {
+  var xs = [], ys = [], n = coefficients.length, ti = 1, i, v;
+  for (i = 0; i < n; ++i, ti *= t) {
+    v = coefficients[i];
+    xs.push(v.x * ti);
+    ys.push(v.y * ti);
+  }
+  return new Vector2d(sum(xs), sum(ys));
+};
+proto = Vector2d.prototype;
+proto.toString = function() {
+  return '[' + this.x + ' ' + this.y + ']';
+};
+proto.unit = function() {
+  return this.scalarDiv(this.length());
+};
+proto.length = function() {
+  return Math.sqrt(this.dotProduct(this));
+};
+proto.dotProduct = function(vector) {
+  return sum([this.x * vector.x, this.y * vector.y]);
+};
+proto.zComponentOfCrossProduct = function(vector) {
+  return this.x * vector.y - this.y * vector.x;
+};
+proto.equals = function(vector, epsilon) {
+  return numberEquals(this.x, vector.x, epsilon) &&
+    numberEquals(this.y, vector.y, epsilon);
+};
+proto.equalsToOneOf = function(vectors, epsilon) {
+  for (var i = 0, n = vectors.length; i < n; ++i) {
+    if (this.equals(vectors[i], epsilon))
+      return true;
+  }
+  return false;
+};
+proto.add = function(vector) {
+  return new Vector2d(this.x + vector.x, this.y + vector.y);
+};
+proto.subtract = function(vector) {
+  return new Vector2d(this.x - vector.x, this.y - vector.y);
+};
+proto.negate = function() {
+  return new Vector2d(-this.x, -this.y);
+};
+proto.scalarMult = function(factor) {
+  return new Vector2d(this.x * factor, this.y * factor);
+};
+proto.scalarDiv = function(factor) {
+  return new Vector2d(this.x / factor, this.y / factor);
 };
 
-function Line(x1, y1, x2, y2) {
-  this.x1 = x1;
-  this.y1 = y1;
-  this.x2 = x2;
-  this.y2 = y2;
+function Line(p0, p1) {
+  this.p0 = p0;
+  this.p1 = p1;
 }
 Line.intersection = function(line1, line2) {
-  var matrix = new numeric.Matrix([
-        [line1.x2 - line1.x1, -(line2.x2 - line2.x1)],
-        [line1.y2 - line1.y1, -(line2.y2 - line2.y1)]]),
-      vector = new numeric.Vector(line2.x1 - line1.x1, line2.y1 - line1.y1),
+  var params = this.paramsAtIntersection(line1, line2);
+  return params ? line1.pointAtT(params[0]) : params;
+};
+Line.paramsAtIntersection = function(line1, line2) {
+  var dp0 = line2.p0.subtract(line1.p0), dv1 = line1.dv(), dv2 = line2.dv(),
+      a = dv1.x, b = -dv2.x, c = dv1.y, d = -dv2.y, e = dp0.x, f = dp0.y,
+      det = a * d - b * c, t, u;
+  if (det) {
+    t = (d * e - b * f) / det, u = (a * f - c * e) / det;
+//console.log('direct t=' + t + ', u=' + u);
+//var p = line1.pointAtT(t), q = line2.pointAtT(u);
+//console.log('direct: p[t]=' + p + ', q[u]=' + q + ', difLen=' + p.subtract(q).length());
+    return [t, u];
+  }
+  else
+    return undefined;
+}
+Line.paramsAtIntersection2 = function(line1, line2) {
+  var dp0 = line2.p0.subtract(line1.p0), dv1 = line1.dv(), dv2 = line2.dv(),
+      matrix = new numeric.Matrix([
+        [dv1.x, -dv2.x],
+        [dv1.y, -dv2.y]]),
+      vector = new numeric.Vector(dp0.x, dp0.y),
       ge = new numeric.GaussElimination(matrix, vector);
+console.log('dv1=' + dv1 + ', dv2=' + dv2);
+console.log('matrix=' + matrix + ', vector=' + vector);
+var a = matrix.elements;
+console.log('det=' + numeric.Matrix.det2by2(a[0][0], a[0][1], a[1][0], a[1][1]));
   if (ge.isSingular())
     return undefined;
   var sol = ge.solution(), t = sol.component(0), u = sol.component(1);
 console.log('t=' + t + ', u=' + u);
-  if (0 <= t && t <= 1 & 0 <= u && u <= 1) {
-    return new Point(
-      line1.x1 + (line1.x2 - line1.x1) * t,
-      line1.y1 + (line1.y2 - line1.y1) * t);
-  }
-  else
-    return undefined;
+console.log('point=' + matrix.multiply(sol) + ', difLen=' + matrix.multiply(sol).subtract(vector).length());
+var p = line1.pointAtT(t), q = line2.pointAtT(u);
+console.log('p[t]=' + p + ', q[u]=' + q + ', difLen=' + p.subtract(q).length());
+
+  var dcmp = new numeric.LUDecomposition(matrix);
+  sol = dcmp.solve(vector);
+  t = sol.component(0), u = sol.component(1);
+console.log('LUDecomp t=' + t + ', u=' + u);
+console.log('LU: point=' + matrix.multiply(sol) + ', difLen=' + matrix.multiply(sol).subtract(vector).length());
+var p = line1.pointAtT(t), q = line2.pointAtT(u);
+console.log('LU: p[t]=' + p + ', q[u]=' + q + ', difLen=' + p.subtract(q).length());
+
+  //if (0 <= t && t <= 1 & 0 <= u && u <= 1) {
+    return [t, u];
+  //}
+  //else
+  //  return undefined;
 };
+var proto = Line.prototype;
+proto.dv = function() {
+  if (!this._dv)
+    this._dv = this.p1.subtract(this.p0);
+  return this._dv;
+}
+proto.length = function() {
+  return this.dv().length();
+};
+proto.pointAtT = function(t) {
+  return Vector2d.polynomial(t, [this.p0, this.dv()]);
+};
+proto.toImplicitLine = function() {
+  var p0 = this.p0, p1 = this.p1, x0 = p0.x, y0 = p0.y, x1 = p1.x, y1 = p1.y;
+  return new ImplicitLine(y1 - y0, x0 - x1, x1 * y0 - x0 * y1);
+};
+proto.distance = function(point) {
+  return Math.abs(this.signedDistance(point));
+};
+proto.signedDistance = function(point) {
+  return point.subtract(this.p0).zComponentOfCrossProduct(this.dv().unit());
+};
+
+// Implicit line ax + by + c = 0
+function ImplicitLine(a, b, c) {
+  this.a = a;
+  this.b = b;
+  this.c = c;
+}
+proto = ImplicitLine.prototype;
+proto.distance = function(point) {
+  return sum([this.a * point.x, this.b * point.y, this.c]);
+}
 
 function Rectangle(x, y, width, height) {
   this.x = x;
@@ -96,50 +225,91 @@ console.log('i=' + i + ', c1y=' + c1[i].y() + ', c2y=' + c2[i].y() + ', cy=' + c
   console.log('solution=' + ge.solution());
 };
 
-Bezier.intersections = function(bezier1, bezier2) {
-  var segments1, segments2, segmentPairs;
-  segments1 = Bezier.intersections.segmentsDevidedByZeroXYDerivPoints(bezier1);
-  segments2 = Bezier.intersections.segmentsDevidedByZeroXYDerivPoints(bezier2);
-  segmentPairs = Bezier.intersections.findSegmentPairs(segments1, segments2);
-  for (var i = 0; i < 4; ++i)
-    segmentPairs = Bezier.intersections.narrowSegmentPairs(bezier1, bezier2, segmentPairs);
-  var points = [];
-  for (var i = 0, n = segmentPairs.length; i < n; ++i) {
-    var point = Bezier.intersections.findIntersectionInSegmentPair(bezier1, bezier2, segmentPairs[i]);
-    if (point)
-      points.push(point);
+//
+// 1. 2本の曲線をX軸またはY軸に平行な点でそれぞれ分割する。
+// 2. 分割された曲線のバウンディングボックスが重なる組み合わせを見つける。
+// 3. 分割された区間で曲線が直線と見なせるか判定する。
+//   3-1. 区間内で曲線の傾きがバウンディングボックスの対角線の傾きと同じに
+//        なる点を探す。そのような点は1つまたは2つ存在する。
+//   3-2. その点とバウンディングボックスの対角線との距離を調べる。
+//   3-3. その距離が指定の誤差範囲内なら直線と見なす。
+// 4. バウンディングボックスが重なる組み合わせのうち、直線と見なせないほう
+//    （片方または両方）を2分割して2.に戻る。
+// 5. バウンディングボックスが重なる組み合わせの両方が直線と見なせるようなら
+//    対角線の2線分の交点を求めればそれが元の2曲線の交点。
+
+Bezier.intersections = function(bezier1, bezier2, tolerance) {
+  var segments1 =
+        Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier1),
+      segments2 =
+        Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier2),
+      segmentPairs =
+        Bezier.intersections.findSegmentPairs(segments1, segments2),
+      points = [];
+console.log('initial segmentPairs:');
+console.log(segmentPairs);
+  for (var i = 0, n = segmentPairs.length; i < n; ++i)
+    findIntersectionInSegmentPair(segmentPairs[i]);
+
+  function findIntersectionInSegmentPair(segmentPair) {
+console.log('findIntersectionInSegmentPair start. segmentPair:');
+console.log(segmentPair);
+    var segment1 = segmentPair[0], segment2 = segmentPair[1],
+        isLine1 = segment1.isAssumableAsLine(tolerance),
+        isLine2 = segment2.isAssumableAsLine(tolerance)
+    if (isLine1 && isLine2) {
+      var point = Line.intersection(segment1.toLine(), segment2.toLine());
+console.log('point');
+console.log(point);
+      if (point && !point.equalsToOneOf(points))
+        points.push(point);
+    }
+    else {
+      var segments1 = isLine1 ? [segment1] : segment1.divideInHalves(),
+          segments2 = isLine2 ? [segment2] : segment2.divideInHalves(),
+          segmentPairs =
+            Bezier.intersections.findSegmentPairs(segments1, segments2);
+      for (var i = 0, n = segmentPairs.length; i < n; ++i)
+        findIntersectionInSegmentPair(segmentPairs[i]);
+    }
   }
+console.log('points');
+console.log(points);
   return points;
 };
 Bezier.intersectionSegmentPairs = function(bezier1, bezier2) {
   var segments1, segments2, segmentPairs;
-  segments1 = Bezier.intersections.segmentsDevidedByZeroXYDerivPoints(bezier1);
-  segments2 = Bezier.intersections.segmentsDevidedByZeroXYDerivPoints(bezier2);
+  segments1 = Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier1);
+  segments2 = Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier2);
   segmentPairs = Bezier.intersections.findSegmentPairs(segments1, segments2);
-  for (var i = 0; i < 0; ++i)
+//segmentPairs = segmentPairs.slice(0, 1);
+  for (var i = 0; i < 1; ++i)
     segmentPairs = Bezier.intersections.narrowSegmentPairs(bezier1, bezier2, segmentPairs);
   return segmentPairs;
 };
-Bezier.intersections.segmentsDevidedByZeroXYDerivPoints = function(bezier) {
-  var cp = bezier.derivativeCoefficients(), ts = [0, 1], segments, i, n;
-  for (i = 0; i < 2; ++i) {
-    var eqn = new numeric.QuadraticEquation(
-          cp[2].component(i), cp[1].component(i), cp[0].component(i)),
-        roots = filterValues(eqn.realRoots(),
-          function(t) { return 0 < t && t < 1});
-    ts = ts.concat(roots);
-  }
-  ts = numeric.uniqAndSort(ts);
+Bezier.intersections.segmentsDividedByZeroXYDerivPoints = function(bezier) {
+  var cv = bezier.derivativeCoefficients(), c0 = cv[0], c1 = cv[1],
+      c2 = cv[2] || Vector2d.ZERO, ts = [0, 1],
+      filterFunc = function (t) { return 0 < t && t < 1; },
+      ts, segments;
+  ts = numeric.uniqAndSort(
+    [0, 1].concat(
+      new QuadraticEquation(c2.x, c1.x, c0.x).realRoots(filterFunc),
+      new QuadraticEquation(c2.y, c1.y, c0.y).realRoots(filterFunc))
+  );
+//console.log('ts');
+//console.log(ts);
 
   segments = [];
   for (i = 0, n = ts.length - 1; i < n; ++i) {
     var tStart = ts[i], tEnd = ts[i + 1],
         pStart = i == 0 ? bezier.pointAtT(tStart) : segments[i - 1].pEnd,
-        pEnd = bezier.pointAtT(tEnd),
-        box = Rectangle.fromTwoCornerPoints([pStart, pEnd]);
-    segments[i] =
-      {tStart: tStart, tEnd: tEnd, pStart: pStart, pEnd: pEnd, box: box};
+        pEnd = bezier.pointAtT(tEnd)
+    segments.push(
+      new BezierMonotonousSegment(bezier, tStart, tEnd, pStart, pEnd));
   }
+//console.log('segments');
+//console.log(segments);
   return segments;
 };
 Bezier.intersections.findSegmentPairs = function(segments1, segments2) {
@@ -151,19 +321,33 @@ Bezier.intersections.findSegmentPairs = function(segments1, segments2) {
     segment1 = segments1[i1];
     for (i2 = 0; i2 < n2; ++i2) {
       segment2 = segments2[i2];
-      if (segment1.box.intersects(segment2.box)) {
+      if (segment1.box().intersects(segment2.box())) {
         segmentPairs.push([segment1, segment2]);
       }
     }
   }
   return segmentPairs;
 };
+Bezier.intersections.segmentLength = function(segment) {
+  return new Line(segment.pStart.x, segment.pStart.y, segment.pEnd.x, segment.pEnd.y).length();
+};
 Bezier.intersections.narrowSegmentPairs = function(bezier1, bezier2, segmentPairs) {
   var newSegmentPairs = [];
   for (var i = 0, n = segmentPairs.length; i < n; ++i) {
     var segmentPair = segmentPairs[i];
-    var segments1 = Bezier.intersections.divideSegment(bezier1, segmentPair[0]);
-    var segments2 = Bezier.intersections.divideSegment(bezier2, segmentPair[1]);
+    var segment1 = segmentPair[0];
+    var segment2 = segmentPair[1];
+    var length1 = Bezier.intersections.segmentLength(segment1);
+    var length2 = Bezier.intersections.segmentLength(segment2);
+    var segments1, segments2;
+    if (length1 > length2) {
+      segments1 = Bezier.intersections.divideSegment(bezier1, segment1);
+      segments2 = [segment2];
+    }
+    else {
+      segments1 = [segment1];
+      segments2 = Bezier.intersections.divideSegment(bezier2, segment2);
+    }
     newSegmentPairs = newSegmentPairs.concat(
       Bezier.intersections.findSegmentPairs(segments1, segments2));
   }
@@ -176,20 +360,33 @@ Bezier.intersections.findIntersectionInSegmentPair = function(bezier1, bezier2, 
     var segments1 = Bezier.intersections.divideSegment(bezier1, segmentPair[0]);
     var segments2 = Bezier.intersections.divideSegment(bezier2, segmentPair[1]);
     var segmentPairs = Bezier.intersections.findSegmentPairs(segments1, segments2);
-console.log('segmentPairs.length=' + segmentPairs.length);
-console.log('segmentPairs');
-console.log(segmentPairs);
-//    if (segmentPairs.length !== 1)
-//      throw new Error('Unexpected segment pair count');
 
-    segmentPair = segmentPairs[0];
-    var newPoint = Bezier.intersections.intersectionOfSegmentPairLines(segmentPair);
-    if (!newPoint || newPoint.equals(point, 1e-10)) {
+    var newPoints = [];
+    var newSegmentPairs = [];
+    for (var i = 0, n = segmentPairs.length; i < n; ++i) {
+      segmentPair = segmentPairs[i];
+      var newPoint = Bezier.intersections.intersectionOfSegmentPairLines(segmentPair);
+      if (newPoint) {
+        newSegmentPairs.push(segmentPair);
+        newPoints.push(newPoint);
+      }
+    }
+    if (newSegmentPairs.length > 1) {
+console.log('segmentPairs.length=' + newSegmentPairs.length);
+console.log('segmentPairs');
+console.log(newSegmentPairs);
+      throw new Error('Unexpected segment pair count = ' + newSegmentPairs.length);
+    }
+
+    if (newPoints.length === 0)
+      return undefined;
+    if (newPoints[0].equals(point, 1e-10)) {
 console.log('iteration count=' + i);
       return point;
     }
 
-    point = newPoint;
+    point = newPoints[0];
+    segmentPair = newSegmentPairs[0];
     ++i;
   }
 
@@ -235,7 +432,7 @@ proto.degree = function() {
   return this.points.length - 1;
 };
 proto.pointAtT = function(t) {
-  return Point.fromVector(numeric.Vector.polynomial(t, this.coefficients()));
+  return Vector2d.polynomial(t, this.coefficients());
 };
 proto.pointAtT2 = function(t) {
   var n = this.degree(), t1 = 1 - t, p = this.points, q = [], i, j;
@@ -272,7 +469,7 @@ proto.coefficients = function() {
   return this._coefficients;
 };
 proto.derivativeAtT = function(t) {
-  return numeric.Vector.polynomial(t, this.derivativeCoefficients());
+  return Vector2d.polynomial(t, this.derivativeCoefficients());
 };
 proto.derivativeCoefficients = function() {
   if (!this._derivativeCoefficients) {
@@ -285,14 +482,15 @@ proto.derivativeCoefficients = function() {
       this._derivativeCoefficients = [c[1], c[2].scalarMult(2)];
       break;
     case 3:
-      this._derivativeCoefficients = [c[1], c[2].scalarMult(2), c[3].scalarMult(3)];
+      this._derivativeCoefficients =
+        [c[1], c[2].scalarMult(2), c[3].scalarMult(3)];
       break;
     }
   }
   return this._derivativeCoefficients;
 };
 proto.secondDerivativeAtT = function(t) {
-  return numeric.Vector.polynomial(t, this.secondDerivativeCoefficients());
+  return Vector2d.polynomial(t, this.secondDerivativeCoefficients());
 };
 proto.secondDerivativeCoefficients = function() {
   if (!this._secondDerivativeCoefficients) {
@@ -305,7 +503,8 @@ proto.secondDerivativeCoefficients = function() {
       this._secondDerivativeCoefficients = [c[2].scalarMult(2)];
       break;
     case 3:
-      this._secondDerivativeCoefficients = [c[2].scalarMult(2), c[3].scalarMult(6)];
+      this._secondDerivativeCoefficients =
+        [c[2].scalarMult(2), c[3].scalarMult(6)];
       break;
     }
   }
@@ -321,7 +520,7 @@ proto.inflectionPointTs = function(includeEnds) {
   case 3:
     var oneThird = 1 / 3,
       a = coef[1].scalarMult(oneThird), b = coef[2].scalarMult(oneThird), c = coef[3];
-      roots = new numeric.QuadraticEquation(
+      roots = new QuadraticEquation(
         b.crossProduct(c).z(), a.crossProduct(c).z(), a.crossProduct(b).z()).
         realRoots();
     var predicate = includeEnds ?
@@ -429,10 +628,10 @@ proto.segments = function() {
   }
   return this._segments;
 };
-proto.segmentsDevidedByZeroXYDerivPoints = function() {
+proto.segmentsDividedByZeroXYDerivPoints = function() {
   var cp = this.derivativeCoefficients(), ts = [0, 1], segments = [], i;
   for (i = 0; i < 2; ++i) {
-    var eqn = new numeric.QuadraticEquation(
+    var eqn = new QuadraticEquation(
           cp[2].component(i), cp[1].component(i), cp[0].component(i)),
         roots = filterValues(eqn.realRoots(),
           function(t) { return 0 < t && t < 1});
@@ -441,34 +640,66 @@ proto.segmentsDevidedByZeroXYDerivPoints = function() {
   var ts = numeric.uniqAndSort(ts);
   for (var i = 0, n = ts.length - 1; i < n; ++i) {
 //console.log('i=' + i + ', ts[i]=' + ts[i] + ', ts[i+1]=' + ts[i + 1]);
-    segments.push(new BezierSegment(this, ts[i], ts[i + 1]));
+    segments.push(new BezierMonotonousSegment(this, ts[i], ts[i + 1]));
   }
   return segments;
 };
 
-function BezierSegment(bezier, tStart, tEnd) {
+function BezierMonotonousSegment(bezier, t1, t2, p1, p2) {
   this.bezier = bezier;
-  this.tStart = tStart;
-  this.tEnd = tEnd;
-
-  this.startPoint = bezier.pointAtT(tStart);
-  this.endPoint = bezier.pointAtT(tEnd);
-  this.box = Rectangle.fromTwoCornerPoints([this.startPoint, this.endPoint]);
+  this.t1 = t1;
+  this.t2 = t2;
+  this.p1 = p1 || bezier.pointAtT(t1);
+  this.p2 = p2 || bezier.pointAtT(t2);
 }
-
-function filterValues(values, predicate) {
-  if (values) {
-    var ret = [], value;
-    for (var i = 0, n = values.length; i < n; ++i) {
-      value = values[i];
-      if (predicate(value))
-        ret.push(value);
+proto = BezierMonotonousSegment.prototype;
+proto.box = function() {
+  return Rectangle.fromTwoCornerPoints([this.p1, this.p2]);
+};
+proto.toLine = function() {
+  return new Line(this.p1, this.p2);
+};
+proto.isAssumableAsLine = function(maxDistance) {
+  var bezier = this.bezier;
+  switch (bezier.degree()) {
+  case 1:
+    return true;
+  case 2:
+  case 3:
+    var ts = this.getTsAtSameGradientAsLine(), n = ts.length,
+        line = this.toLine(), i;
+    if (n === 0)
+      throw new Error('Unexpected error');
+    dist = 0;
+    for (i = 0; i < n; ++i) {
+      var t = ts[i];
+      var d = line.distance(bezier.pointAtT(ts[i]));
+//console.log('t=' + t + ', d=' + d);
+      dist = Math.max(dist, d);
     }
-    return ret;
+    return dist <= maxDistance;
   }
-  else
-    return values;
-}
+};
+proto.getTsAtSameGradientAsLine = function() {
+  var cv = this.bezier.derivativeCoefficients(), c0 = cv[0], c1 = cv[1],
+      c2 = cv[2] || Vector2d.ZERO,
+      dv = this.toLine().dv(), dx = dv.x, dy = dv.y,
+      t1 = this.t1, t2 = this.t2;
+  return new QuadraticEquation(
+    c2.x * dy - c2.y * dx,
+    c1.x * dy - c1.y * dx,
+    c0.x * dy - c0.y * dx
+  ).realRoots(function(t) { return t1 <= t && t <= t2; });
+};
+proto.divideInHalves = function() {
+  var bezier = this.bezier, t1 = this.t1, t2 = this.t2,
+      p1 = this.p1, p2 = this.p2,
+      tMid = (t1 + t2) / 2, pMid = bezier.pointAtT(tMid);
+  return [
+    new BezierMonotonousSegment(bezier, t1, tMid, p1, pMid),
+    new BezierMonotonousSegment(bezier, tMid, t2, pMid, p2)
+  ];
+};
 
 function binarySearch(mappings, searchIndex, searchValue) {
   // http://en.wikipedia.org/wiki/Binary_search_algorithm
@@ -493,11 +724,11 @@ function calcLinearInterpolation(x, x0, x1, y0, y1) {
 }
 
 return {
-  Point: Point,
+  Vector2d: Vector2d,
   Line: Line,
   Rectangle: Rectangle,
   Bezier: Bezier,
-  BezierSegment: BezierSegment
+  BezierMonotonousSegment: BezierMonotonousSegment
 };
   
 }();

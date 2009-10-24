@@ -1,0 +1,58 @@
+<html>
+<head>
+<title>Bezier sample#2</title>
+<style type="text/css">
+@import "../lib/jquery.svg/jquery.svg.css";
+
+#svg1 { width: 1000px; height: 800px; border: 1px solid #000; }
+</style>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.js"></script>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.svg.js"></script>
+<script type="text/javascript" src="../src/numeric.js"></script>
+<script type="text/javascript" src="../src/geom2d.js"></script>
+<script type="text/javascript">
+$(function() {
+
+  function drawInitial(svg) {
+//    var cp = [[400, 500], [450, -300], [500, 1100], [550, 100]];
+    var cp = [[300, 400], [500, 600], [600, 500], [640, 480]];
+    var ps =geom2d.Vector2d.vectorsFromNestedXYArray(cp);
+    var bezier = new geom2d.Bezier(ps);
+
+    var path = svg.createPath().
+      move(ps[0].x, ps[0].y).
+      curveC(ps[1].x, ps[1].y, ps[2].x, ps[2].y, ps[3].x, ps[3].y);
+    var pathElem = svg.path(path, {fill: 'none', stroke: '#0f0'});
+
+
+    var tStart = 0;
+    var tEnd = 0.24412326925502156; 
+    var tEnd = 1;
+    var seg = new geom2d.BezierMonotonousSegment(bezier, tStart, tEnd);
+    svg.line(seg.p1.x, seg.p1.y, seg.p2.x, seg.p2.y, {fill: 'none', stroke: '#f00'});
+
+      var line = seg.toLine()
+for (var j = 0, n = 10; j < n; ++j) {
+  var t = tStart + (tEnd - tStart) * j / n;
+  var p = bezier.pointAtT(t);
+  console.log('j=' + j + ', d=' + line.signedDistance(p));
+  svg.circle(p.x, p.y, 2, {fill: 'none', stroke: '#00f'});
+}
+    var ts = seg.getTsAtSameGradientAsLine();
+    for (var i = 0, n = ts.length; i < n; ++i) {
+      var t = ts[i];
+      var p = bezier.pointAtT(t);
+      var d = bezier.derivativeAtT(t);
+      svg.line(p.x, p.y, p.x + d.x, p.y + d.y, {fill: 'none', stroke: '#000'});
+    }
+  }
+
+	$('#svg1').svg({onLoad: drawInitial});
+});
+</script>
+</head>
+<body>
+<h1>Bezier sample#2</h1>
+<div id="svg1"></div>
+</body>
+</html>

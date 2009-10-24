@@ -1,0 +1,103 @@
+<html>
+<head>
+<title>Bezier sample#3</title>
+<style type="text/css">
+@import "../lib/jquery.svg/jquery.svg.css";
+
+#svg1 { width: 1000px; height: 800px; border: 1px solid #000; }
+</style>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.js"></script>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.svg.js"></script>
+<script type="text/javascript" src="../src/numeric.js"></script>
+<script type="text/javascript" src="../src/geom2d.js"></script>
+<script type="text/javascript">
+$(function() {
+
+  function drawBezier(svg, xyArray) {
+    var ps = geom2d.Vector2d.vectorsFromNestedXYArray(xyArray);
+    var path = svg.createPath().
+      move(ps[0].x, ps[0].y).
+      curveC(ps[1].x, ps[1].y, ps[2].x, ps[2].y, ps[3].x, ps[3].y);
+    var pathElem = svg.path(path, {fill: 'none', stroke: '#0f0'});
+    return new geom2d.Bezier(ps);
+  }
+
+  function drawLine(svg, line, color) {
+    svg.line(line.p0.x, line.p0.y, line.p1.x, line.p1.y,
+      {fill: 'none', stroke: color});
+    drawPoint(svg, line.p1, color);
+  }
+
+  function drawSegmentPairs(svg, segmentPairs) {
+    for (var i = 0, n = segmentPairs.length; i < n; ++i) {
+      var segmentPair = segmentPairs[i];
+      var seg1 = segmentPair[0];
+      var seg2 = segmentPair[1];
+      drawLine(svg, seg1.toLine(), '#c0c');
+      drawLine(svg, seg2.toLine(), '#880');
+    }
+  }
+
+  function drawPoint(svg, point, fill) {
+    svg.circle(point.x, point.y, 1, {fill: fill, stroke: 'none'});
+  }
+
+  function drawInitial(svg) {
+    var cp1 = [[300, 200], [1000, 500], [0, 500], [600, 200]],
+        cp2 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
+//    var cp1 = [[400, 500], [450, -300], [500, 1100], [550, 100]];
+//    var cp2 = [[300, 400], [500, 600], [600, 500], [640, 480]];
+
+    var bezier1 = drawBezier(svg, cp1);
+    var bezier2 = drawBezier(svg, cp2);
+    var Bezier = geom2d.Bezier;
+    var segments1 = Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier1);
+    var segments2 = Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier2);
+    var segmentPairs = Bezier.intersections.findSegmentPairs(segments1, segments2);
+
+    var tolerance = 1e-10, pointOffsetEps = 1e-9;
+    var tolerance = 1e-9, pointOffsetEps = 1e-8;
+    var tolerance = 1e-9, pointOffsetEps = 1e-7;
+    var tolerance = 1e-7, pointOffsetEps = 1e-6;
+
+    var points = [];
+    var Line = geom2d.Line;
+    for (var i = 0, n = segmentPairs.length; i < n; ++i)
+      findIntersectionInSegmentPair(segmentPairs[i]);
+
+    function findIntersectionInSegmentPair(segmentPair) {
+      var segment1 = segmentPair[0], segment2 = segmentPair[1],
+          isLine1 = segment1.isAssumableAsLine(tolerance),
+          isLine2 = segment2.isAssumableAsLine(tolerance)
+      if (isLine1 && isLine2) {
+        var point = Line.intersection(segment1.toLine(), segment2.toLine());
+        //drawSegmentPairs(svg, [segmentPair]);
+        if (point && !point.equalsToOneOf(points, pointOffsetEps)) {
+//console.log('point');
+//console.log(point);
+          points.push(point);
+          drawPoint(svg, point, '#000');
+        }
+      }
+      else {
+        var segments1 = isLine1 ? [segment1] : segment1.divideInHalves(),
+            segments2 = isLine2 ? [segment2] : segment2.divideInHalves(),
+            segmentPairs =
+              Bezier.intersections.findSegmentPairs(segments1, segments2);
+        for (var i = 0, n = segmentPairs.length; i < n; ++i)
+          findIntersectionInSegmentPair(segmentPairs[i]);
+      }
+    }
+
+console.log('points.length=' + points.length);
+  }
+
+	$('#svg1').svg({onLoad: drawInitial});
+});
+</script>
+</head>
+<body>
+<h3>Bezier sample#3</h1>
+<div id="svg1"></div>
+</body>
+</html>
