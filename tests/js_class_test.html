@@ -1,0 +1,126 @@
+<html>
+<head>
+<title>javascript class test</title>
+<link rel="stylesheet" href="lib/qunit.css" type="text/css" media="screen">
+<script src="lib/qunit.js"></script>
+<script src="../src/stopwatch.js"></script>
+<script>
+window.onload = function() {
+  module('javascript class');
+
+  var REPEAT_COUNT = 1e5;
+
+  test('strategy class', function() {
+    function StrategyA() {}
+    StrategyA.prototype.execute = function execute() {
+      return 1;
+    };
+
+    function StrategyB() {}
+    StrategyB.prototype.execute = function execute() {
+      return 2;
+    };
+    
+    var strategy = StrategyA;
+    equals(new strategy().execute(), 1, 'execute strategy');
+  });
+
+  test('strategy method using class', function() {
+    function StrategyA() {}
+    StrategyA.execute = function execute() {
+      return new StrategyA().execute();
+    };
+    StrategyA.prototype.execute = function execute() {
+      return 1;
+    };
+
+    function StrategyB() {}
+    StrategyB.execute = function execute() {
+      return new StrategyB().execute();
+    };
+    StrategyB.prototype.execute = function execute() {
+      return 2;
+    };
+
+    var strategy = StrategyA.execute;
+    equals(strategy(), 1, 'execute strategy');
+  });
+
+  test('call factory by Function.call', function() {
+    function A(a) {
+      this.a = a;
+    }
+    A.create = function create(a) {
+      return new A(a);
+    };
+    A.prototype.run = function run() {
+      return this.a;
+    };
+
+    console.log('simple new: elapsed=' + new Stopwatch().measure(REPEAT_COUNT, function() {
+      return new A(1);
+    }));
+
+    equals(A.create.call(undefined, 3).run(), 3, 'call factory by Function.call');
+  });
+
+  test('call modified constructor by Function.call', function() {
+    function A(a) {
+      if (!(this instanceof A))
+        return new A(a);
+      this.a = a;
+    }
+    A.prototype.run = function run() {
+      return this.a;
+    };
+
+    console.log('instance check in new: elapsed=' + new Stopwatch().measure(REPEAT_COUNT, function() {
+      return new A(1);
+    }));
+    console.log('call without new: elapsed=' + new Stopwatch().measure(REPEAT_COUNT, function() {
+      return A(1);
+    }));
+
+    equals(A.call(undefined, 3).run(), 3, 'call modified construtor by Function.call');
+  });
+
+  test('argument count check', function() {
+    function A() {
+      if (arguments.length === 1)
+        this.points = arguments[0];
+      else
+        this.points = arguments;
+    }
+
+    console.log('check with arguments.length: ' + new Stopwatch().measure(1e5, function() {
+      return new A([1, 2]);
+    }));
+  });
+
+  test('array check', function() {
+    function A() {
+      if (isArray(arguments[0]))
+        this.points = arguments[0];
+      else
+        this.points = arguments;
+    }
+
+    var toString = Object.prototype.toString;
+    function isArray(obj) {
+      return toString.call(obj) === '[object Array]';
+    }
+
+    console.log('check with isArray: ' + new Stopwatch().measure(1e5, function() {
+      return new A([1, 2]);
+    }));
+  });
+};
+</script>
+</head>
+<body>
+  <h1 id="qunit-header">javascript class test</h1>
+  <h2 id="qunit-banner"></h2>
+  <h2 id="qunit-userAgent"></h2>
+  <ol id="qunit-tests"></ol>
+</body>
+</html>

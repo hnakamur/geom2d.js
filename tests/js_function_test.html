@@ -1,0 +1,73 @@
+<html>
+<head>
+<title>javascript function test</title>
+<link rel="stylesheet" href="lib/qunit.css" type="text/css" media="screen"></link>
+<script src="lib/qunit.js"></script>
+<script>
+window.onload = function() {
+
+  module('function');
+
+  test('set named function to var', function() {
+    var f = function f1() {
+      return 3;
+    }
+
+    equals(f(), 3, 'call by f()');
+    ok(typeof f1 === 'undefined', 'f1 is undefined');
+  });
+
+  test('set named function to var using conditional operator', function() {
+    var f = true ?
+      function f1() { return 1; } :
+      function f1() { return 2; };
+
+    equals(f(), 1, 'call by f()');
+    ok(typeof f1 === 'undefined', 'f1 is undefined');
+
+    var f = false ?
+      function f1() { return 1; } :
+      function f1() { return 2; };
+
+    equals(f(), 2, 'call by f()');
+    ok(typeof f1 === 'undefined', 'f1 is undefined');
+  });
+
+  test('define named function then set it to var', function() {
+    function f1() {
+      return 3;
+    }
+    var f = f1;
+
+    equals(f(), 3, 'call by f()');
+    equals(f1(), 3, 'call by f1()');
+  });
+
+  test('mix named function using conditional operator', function() {
+    function A() {
+    }
+
+    mix(A.prototype, {
+      f: (true ?
+        function f() { return 1; } :
+        function f() { return 0; })
+    });
+
+    function mix(dest, src) {
+      for (var k in src)
+        dest[k] = src[k];
+      return dest;
+    }
+
+    equals(new A().f(), 1, 'call by f()');
+  });
+};
+</script>
+</head>
+<body>
+  <h1 id="qunit-header">javascript function test</h1>
+  <h2 id="qunit-banner"></h2>
+  <h2 id="qunit-userAgent"></h2>
+  <ol id="qunit-tests"></ol>
+</body>
+</html>

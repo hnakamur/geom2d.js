@@ -28,14 +28,14 @@ $(function() {
     var tStart = 0;
     var tEnd = 0.24412326925502156; 
     var tEnd = 1;
-    var seg = new geom2d.BezierMonotonousSegment(bezier, tStart, tEnd);
+    var seg = new geom2d.BezierSegment(bezier, tStart, tEnd);
     svg.line(seg.p1.x, seg.p1.y, seg.p2.x, seg.p2.y, {fill: 'none', stroke: '#f00'});
 
       var line = seg.toLine()
 for (var j = 0, n = 10; j < n; ++j) {
   var t = tStart + (tEnd - tStart) * j / n;
   var p = bezier.pointAtT(t);
-  console.log('j=' + j + ', d=' + line.signedDistance(p));
+  console.log('j=' + j + ', d=' + line.distance(p));
   svg.circle(p.x, p.y, 2, {fill: 'none', stroke: '#00f'});
 }
     var ts = seg.getTsAtSameGradientAsLine();

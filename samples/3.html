@@ -50,45 +50,15 @@ $(function() {
 
     var bezier1 = drawBezier(svg, cp1);
     var bezier2 = drawBezier(svg, cp2);
-    var Bezier = geom2d.Bezier;
-    var segments1 = Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier1);
-    var segments2 = Bezier.intersections.segmentsDividedByZeroXYDerivPoints(bezier2);
-    var segmentPairs = Bezier.intersections.findSegmentPairs(segments1, segments2);
-
-    var tolerance = 1e-10, pointOffsetEps = 1e-9;
-    var tolerance = 1e-9, pointOffsetEps = 1e-8;
-    var tolerance = 1e-9, pointOffsetEps = 1e-7;
-    var tolerance = 1e-7, pointOffsetEps = 1e-6;
-
-    var points = [];
-    var Line = geom2d.Line;
-    for (var i = 0, n = segmentPairs.length; i < n; ++i)
-      findIntersectionInSegmentPair(segmentPairs[i]);
-
-    function findIntersectionInSegmentPair(segmentPair) {
-      var segment1 = segmentPair[0], segment2 = segmentPair[1],
-          isLine1 = segment1.isAssumableAsLine(tolerance),
-          isLine2 = segment2.isAssumableAsLine(tolerance)
-      if (isLine1 && isLine2) {
-        var point = Line.intersection(segment1.toLine(), segment2.toLine());
-        //drawSegmentPairs(svg, [segmentPair]);
-        if (point && !point.equalsToOneOf(points, pointOffsetEps)) {
-//console.log('point');
-//console.log(point);
-          points.push(point);
-          drawPoint(svg, point, '#000');
-        }
-      }
-      else {
-        var segments1 = isLine1 ? [segment1] : segment1.divideInHalves(),
-            segments2 = isLine2 ? [segment2] : segment2.divideInHalves(),
-            segmentPairs =
-              Bezier.intersections.findSegmentPairs(segments1, segments2);
-        for (var i = 0, n = segmentPairs.length; i < n; ++i)
-          findIntersectionInSegmentPair(segmentPairs[i]);
-      }
+    var lineTolerance = 1e-10, pointTolerance = 1e-9;
+    //var lineTolerance = 1e-9, pointTolerance = 1e-8;
+    //var lineTolerance = 1e-9, pointTolerance = 1e-7;
+    //var lineTolerance = 1e-7, pointTolerance = 1e-6;
+    var points = geom2d.BezierIntersectionBBoxAlgorithm.execute(
+      bezier1, bezier2, pointTolerance, lineTolerance);
+    for (var i = 0, n = points.length; i < n; ++i) {
+      drawPoint(svg, points[i], '#000');
     }
-
 console.log('points.length=' + points.length);
   }
 
