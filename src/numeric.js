@@ -54,6 +54,47 @@ proto.discriminant = function() {
   return this.b * this.b - 4 * this.a * this.c;
 };
 
+// x^3 + a x^2 + b x + c = 0
+function CubicEquation(a, b, c) {
+  this.a = a;
+  this.b = b;
+  this.c = c;
+}
+mix(CubicEquation.prototype, {
+  realRoots: function realRoots(predicate) {
+    var a = this.a, b = this.b, c = this.c;
+    var q = (a * a - 3 * b) / 9;
+    var r = (2 * a * a * a - 9 * a * b + 27 * c) / 54;
+    var r2 = r * r;
+    var q3 = q * q * q;
+    var adiv3 = a / 3;
+    var roots;
+    if (r2 < q3) {
+      var theta = Math.acos(r / Math.sqrt(q3));
+      var m2sqrtq = -2 * Math.sqrt(q);
+      roots = [
+        m2sqrtq * Math.cos(theta / 3) - adiv3,
+        m2sqrtq * Math.cos((theta + 2 * Math.PI) / 3) - adiv3,
+        m2sqrtq * Math.cos((theta - 2 * Math.PI) / 3) - adiv3
+      ];
+    }
+    else {
+      var sgnr = r > 0 ? 1 : -1;
+      var la = -sgnr * Math.pow(Math.abs(r) + Math.sqrt(r2 - q3), 1 / 3);
+      var lb = la !== 0 ? q / la : 0;
+      roots = [(la + lb) - adiv3];
+      if (la === lb)
+        roots.push(-(la + lb) / 2 - adiv3);
+    }
+    roots = uniqAndSort(roots);
+    return predicate ? filterValues(roots, predicate) : roots;
+  },
+  valueAt: function valueAt(x) {
+    var x2 = x * x, x3 = x2 * x;
+    return sum([x3, this.a * x2, this.b * x, this.c]);
+  }
+});
+
 // sum(c[i] * t^i) (i=0..n)
 function Polynomial(coefficients) {
   this.coefficients = coefficients;
@@ -972,6 +1013,29 @@ function log() {
     console.log.apply(console, arguments);
 }
 
+function Set(values) {
+  this.values = {};
+  for (var i = 0, n = values.length; i < n; ++i) {
+    var value = values[i];
+    if (!(value in this.values))
+      this.values[value] = value;
+  }
+}
+mix(Set.prototype, {
+  intersect: function intersect(set) {
+    var values = this.values;
+    if (!(value in values))
+      values[value] = value;
+    return this;
+  }
+});
+
+function mix(dest, src) {
+  for (var k in src)
+    dest[k] = src[k];
+  return dest;
+}
+
 return {
   MACHINE_EPSILON: MACHINE_EPSILON,
   log: log,
@@ -984,6 +1048,7 @@ return {
   integral: integral,
   sortBy: sortBy,
   QuadraticEquation: QuadraticEquation,
+  CubicEquation: CubicEquation,
   Polynomial: Polynomial,
   Vector: Vector,
   Vector3d: Vector3d,

@@ -116,6 +116,12 @@ mix(Line.prototype, {
   tAtLength: function tAtLength(length) {
     return length / this.length();
   },
+  tAtX: function tAtX(x) {
+    return (x - this.p0.x) / this.dv().x;
+  },
+  tAtY: function tAtY(y) {
+    return (y - this.p0.y) / this.dv().y;
+  },
   tsAtIntersection: function tsAtIntersection(line) {
     var dp0 = line.p0.subtract(this.p0), dv1 = this.dv(), dv2 = line.dv(),
         a = dv1.x, b = -dv2.x, c = dv1.y, d = -dv2.y, e = dp0.x, f = dp0.y,
@@ -149,6 +155,51 @@ mix(Rectangle.prototype, {
   intersects: function intersects(rect) {
     return this.x <= rect.x + rect.width && this.x + this.width >= rect.x &&
       this.y <= rect.y + rect.height && this.y + this.height >= rect.y;
+  }
+});
+
+function QuadraticBezier(p0, p1, p2) {
+  this.p0 = p0;
+  this.p1 = p1;
+  this.p2 = p2;
+}
+mix(QuadraticBezier.prototype, {
+  coefficients: function coefficients() {
+    if (!this._coefficients) {
+      var p0 = this.p0, p1 = this.p1, p2 = this.p2,
+          p10 = p1.subtract(p0), p21 = p2.subtract(p1);
+      this._coefficients = [p0, p10.scalarMult(2), p21.subtract(p10)];
+    }
+    return this._coefficients;
+  },
+  pointAtT: function pointAtT(t) {
+    return Vector2d.polynomial(t, this.coefficients());
+  },
+  tAtXY: function tAtPoint(x, y) {
+    var c = this.coefficients(), c0 = c[0], c1 = c[1], c2 = c[2];
+    var a0 = c0.x, a1 = c1.x, a2 = c2.x;
+    var b0 = c0.y, b1 = c1.y, b2 = c2.y;
+    var d21 = a2 * b1 - a1 * b2;
+    var t = -sum([b2 * x, -a2 * y, a2 * b0 - a0 * b2]) / d21;
+    if (isNaN(t)) {
+      t = -sum([b1 * x, -a1 * y, a1 * b0 - a0 * b1]) /
+        sum([b2 * x, -a2 * y, a2 * b0 - a0 * b2]);
+      if (isNaN(t)) {
+      }
+    }
+    return t;
+  },
+  tsAtX: function tsAtX(x) {
+    var c = this.coefficients;
+    return realRootsOfQuadraticEquation(c[2].x, c[1].x, c[0].x - x,
+      function(t) { return 0 <= t && t <= 1; }
+    );
+  },
+  tsAtY: function tsAtY(y) {
+    var c = this.coefficients;
+    return realRootsOfQuadraticEquation(c[2].y, c[1].y, c[0].y - y,
+      function(t) { return 0 <= t && t <= 1; }
+    );
   }
 });
 
@@ -605,6 +656,7 @@ return {
   Vector2d: Vector2d,
   Line: Line,
   Rectangle: Rectangle,
+  QuadraticBezier: QuadraticBezier,
   Bezier: Bezier,
   BezierSegment: BezierSegment,
   BezierIntersectionBBoxAlgorithm: BezierIntersectionBBoxAlgorithm
