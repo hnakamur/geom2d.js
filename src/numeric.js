@@ -12,47 +12,48 @@ function QuadraticEquation(a, b, c) {
   this.b = b;
   this.c = c;
 }
-var proto = QuadraticEquation.prototype;
-proto.valueAt = function(x) {
-  return sum([this.a * x * x, this.b * x, this.c]);
-};
-proto.derivAt = function(x) {
-  return 2 * this.a * x + this.b;
-};
-proto.realRoots = function(predicate) {
-  // http://en.wikipedia.org/wiki/Quadratic_equation
-  var roots;
-  if (this.a) {
-    var dis = this.discriminant();
-//log('a=' + this.a + ', b=' + this.b + ', c=' + this.c + ', dis=' + dis);
-    if (dis > 0) {
-      var a = this.a, b = this.b, c = this.c,
-          sgn = b > 0 ? 1 : -1,
-          t = -0.5 * (b + sgn * Math.sqrt(dis)),
-          x1 = t / a,
-          x2 = c / t;
-          y1 = this.valueAt(x1),
-          y2 = this.valueAt(x2);
-//log('x1=' + x1 + ', x2=' + x2);
-      //x1 = -0.5 * (b + Math.sqrt(dis));
-      //x2 = -0.5 * (b - Math.sqrt(dis));
-      roots = x1 < x2 ? [x1, x2] : [x2, x1];
+mix(QuadraticEquation.prototype, {
+  valueAt: function valueAt(x) {
+    return sum([this.a * x * x, this.b * x, this.c]);
+  },
+  derivativeValueAt: function derivativeValueAt(x) {
+    return 2 * this.a * x + this.b;
+  },
+  realRoots: function realRoots(predicate) {
+    // http://en.wikipedia.org/wiki/Quadratic_equation
+    var roots;
+    if (this.a) {
+      var dis = this.discriminant();
+  //log('a=' + this.a + ', b=' + this.b + ', c=' + this.c + ', dis=' + dis);
+      if (dis > 0) {
+        var a = this.a, b = this.b, c = this.c,
+            sgn = b > 0 ? 1 : -1,
+            t = -0.5 * (b + sgn * Math.sqrt(dis)),
+            x1 = t / a,
+            x2 = c / t;
+            y1 = this.valueAt(x1),
+            y2 = this.valueAt(x2);
+  //log('x1=' + x1 + ', x2=' + x2);
+        //x1 = -0.5 * (b + Math.sqrt(dis));
+        //x2 = -0.5 * (b - Math.sqrt(dis));
+        roots = x1 < x2 ? [x1, x2] : [x2, x1];
+      }
+      else if (dis === 0)
+        roots = [-0.5 * this.b / this.a];
+      else
+        roots = [];
     }
-    else if (dis === 0)
-      roots = [-0.5 * this.b / this.a];
+    else if (this.b)
+      roots = [-this.c / this.b];
     else
       roots = [];
-  }
-  else if (this.b)
-    roots = [-this.c / this.b];
-  else
-    roots = [];
 
-  return predicate ? filterValues(roots, predicate) : roots;
-};
-proto.discriminant = function() {
-  return this.b * this.b - 4 * this.a * this.c;
-};
+    return predicate ? filterValues(roots, predicate) : roots;
+  },
+  discriminant: function discriminant() {
+    return this.b * this.b - 4 * this.a * this.c;
+  }
+});
 
 // x^3 + a x^2 + b x + c = 0
 function CubicEquation(a, b, c) {
@@ -61,7 +62,11 @@ function CubicEquation(a, b, c) {
   this.c = c;
 }
 mix(CubicEquation.prototype, {
+  derivativeValueAt: function valueAt(x) {
+    return sum([3 * x * x, 2 * this.a * x, this.b]);
+  },
   realRoots: function realRoots(predicate) {
+    // see p.228 of Numerical Recipe 3rd ed (ISBN: 978-0-521-88068-8)
     var a = this.a, b = this.b, c = this.c;
     var q = (a * a - 3 * b) / 9;
     var r = (2 * a * a * a - 9 * a * b + 27 * c) / 54;
@@ -86,7 +91,16 @@ mix(CubicEquation.prototype, {
       if (la === lb)
         roots.push(-(la + lb) / 2 - adiv3);
     }
+
     roots = uniqAndSort(roots);
+
+    var self = this;
+    var newtonMethodEpsilon = 1e-12;
+    roots = new NewtonRaphsonMethod(
+      function(x) { return self.valueAt(x); },
+      function(x) { return self.derivativeValueAt(x); }
+    ).polishRoots(roots, newtonMethodEpsilon);
+
     return predicate ? filterValues(roots, predicate) : roots;
   },
   valueAt: function valueAt(x) {
@@ -157,20 +171,39 @@ function NewtonRaphsonMethod(func, derivFunc) {
   this.func = func;
   this.derivFunc = derivFunc;
 }
-var proto = NewtonRaphsonMethod.prototype;
-proto.findOneRoot = function(guess, epsilon) {
-  log('findOneRoot initial guess=' + guess);
-  var f = this.func, df = this.derivFunc, i = -1;
-  while (++i < proto.findOneRoot.MaxIteration) {
-    var nextGuess = guess - f(guess) / df(guess);
-    log('guess=' + guess + ' next=' + nextGuess);
-    if (numberEquals(nextGuess, guess, epsilon))
-      return nextGuess;
-    guess = nextGuess;
+mix(NewtonRaphsonMethod.prototype, {
+  findOneRoot: function findOneRoot(guess, epsilon) {
+    log('findOneRoot initial guess=' + guess);
+    var f = this.func, df = this.derivFunc, i = -1;
+    while (++i < this.maxIteration) {
+      var nextGuess = guess - f(guess) / df(guess);
+      log('guess=' + guess + ' next=' + nextGuess);
+      if (numberEquals(nextGuess, guess, epsilon))
+        return nextGuess;
+      guess = nextGuess;
+    }
+    throw new Error('Iteration count reached the limit.');
+  },
+  maxIteration: 100,
+  polishRoots: function polishRoots(roots, epsilon) {
+    var polishedRoots = [];
+    for (var i = 0, n = roots.length; i < n; ++i) {
+      var root = roots[i];
+      var value = this.func(root);
+      if (value !== 0) {
+        var newRoot = this.findOneRoot(root, epsilon);
+        var newValue = this.func(newRoot);
+        if (Math.abs(newValue) < Math.abs(value))
+          polishedRoots.push(newRoot);
+        else
+          polishedRoots.push(root);
+      }
+      else
+        polishedRoots.push(root);
+    }
+    return polishedRoots;
   }
-  throw new Error('Iteration count reached the limit.');
-}
-proto.findOneRoot.MaxIteration = 1000;
+});
 
 function numberEquals(x, y, epsilon) {
   return epsilon ? Math.abs(x - y) <= epsilon : x === y;
