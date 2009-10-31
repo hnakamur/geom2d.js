@@ -8,7 +8,6 @@ function Vector2d(x, y) {
   this.y = y;
 }
 mix(Vector2d, {
-  ZERO: new Vector2d(0, 0),
   vectorsFromNestedXYArray: function vectorsFromNestedXYArray(xyArray) {
     var vectors = [], n = xyArray.length, i, xy;
     for (i = 0; i < n; ++i) {
@@ -34,9 +33,15 @@ mix(Vector2d, {
       ys.push(v.y * ti);
     }
     return new Vector2d(sum(xs), sum(ys));
-  }
+  },
+  ZERO: new Vector2d(0, 0)
 });
 mix(Vector2d.prototype, {
+  angleTo: function angleTo(vector) {
+    // p. 1120, Numerical Recipe 3rd ed.
+    return Math.atan2(this.zComponentOfCrossProduct(vector),
+        this.dotProduct(vector));
+  },
   toString: function toString() {
     return '[' + this.x + ' ' + this.y + ']';
   },

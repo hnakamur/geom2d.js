@@ -3,6 +3,7 @@
 <title>numeric test</title>
 <link rel="stylesheet" href="lib/qunit.css" type="text/css" media="screen"></link>
 <script src="lib/qunit.js"></script>
+<script src="../lib/json2.js"></script>
 <script src="../src/numeric.js"></script>
 <script>
 window.onload = function() {
@@ -110,6 +111,37 @@ console.log('root=' + roots[i] + ', value=' + eqn.valueAt(roots[i]));
     }
   });
 
+  test('cubic equation (one root finder)', function() {
+    var poly = new numeric.Polynomial([4, 3, -10, 1]);
+    var f = numeric.bind(poly.valueAt, poly);
+    var deriv = poly.derivative();
+    var df = numeric.bind(deriv.valueAt, deriv);
+    var finder = new numeric.OneRootFinder(f, df);
+    var root = finder.findOneRootBetween(-0.4, 9 /*, 1e-12*/);
+    console.log('OneRootFinder root=' + root + ', value=' + f(root) + ', iter=' + finder.iter);
+  });
+
+  test('cubic equation (three real roots)', function() {
+    var poly = new numeric.Polynomial([4, 3, -10, 1]);
+    var roots = poly.realRootsBetween(-1, 10);
+console.log('roots.length=' + roots.length);
+    for (var i = 0, n = roots.length; i < n; ++i) {
+console.log('root=' + roots[i] + ', value=' + poly.valueAt(roots[i]));
+      ok(numeric.numberEquals(poly.valueAt(roots[i]), 0, 1e-12), 'equation value at root #' + i);
+    }
+  });
+
+  test('degree 9 polynomial equation (three real roots between 0 and 1)', function() {
+    var poly = new numeric.Polynomial([984100, -458200, 8868537, -9420593, 5949408, -2282850, 522890, -67572, 4401, -109].reverse());
+    //var roots = poly.realRootsBetween(0, 1, 1e-12);
+    var roots = poly.realRoots(1e-12);
+console.log('9 degree poly. roots=' + JSON.stringify(roots));
+    equals(roots.length, 3, '3 roots exist.');
+    for (var i = 0, n = roots.length; i < n; ++i) {
+console.log('root=' + roots[i] + ', value=' + poly.valueAt(roots[i]));
+      ok(numeric.numberEquals(poly.valueAt(roots[i]), 0, 1e-12), 'equation value at root #' + i);
+    }
+  });
   test('polynomial resultant (degree 1)', function() {
     var f, g, r;
 

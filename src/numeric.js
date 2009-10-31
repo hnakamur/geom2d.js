@@ -15,6 +15,7 @@ function QuadraticEquation(a, b, c) {
 mix(QuadraticEquation.prototype, {
   valueAt: function valueAt(x) {
     return sum([this.a * x * x, this.b * x, this.c]);
+    //return (this.a * x + this.b) * x + this.c; <- this is unstable.
   },
   derivativeValueAt: function derivativeValueAt(x) {
     return 2 * this.a * x + this.b;
@@ -27,12 +28,12 @@ mix(QuadraticEquation.prototype, {
   //log('a=' + this.a + ', b=' + this.b + ', c=' + this.c + ', dis=' + dis);
       if (dis > 0) {
         var a = this.a, b = this.b, c = this.c,
-            sgn = b > 0 ? 1 : -1,
-            t = -0.5 * (b + sgn * Math.sqrt(dis)),
+            sgnB = sgn(b),
+            t = -0.5 * (b + sgnB * Math.sqrt(dis)),
             x1 = t / a,
             x2 = c / t;
-            y1 = this.valueAt(x1),
-            y2 = this.valueAt(x2);
+            //y1 = this.valueAt(x1),
+            //y2 = this.valueAt(x2);
   //log('x1=' + x1 + ', x2=' + x2);
         //x1 = -0.5 * (b + Math.sqrt(dis));
         //x2 = -0.5 * (b - Math.sqrt(dis));
@@ -64,6 +65,7 @@ function CubicEquation(a, b, c) {
 mix(CubicEquation.prototype, {
   derivativeValueAt: function valueAt(x) {
     return sum([3 * x * x, 2 * this.a * x, this.b]);
+    //return (3 * x + 2 * this.a) * x + this.b;
   },
   realRoots: function realRoots(predicate) {
     // see p.228 of Numerical Recipe 3rd ed (ISBN: 978-0-521-88068-8)
@@ -106,19 +108,22 @@ mix(CubicEquation.prototype, {
   valueAt: function valueAt(x) {
     var x2 = x * x, x3 = x2 * x;
     return sum([x3, this.a * x2, this.b * x, this.c]);
+    //return ((x + this.a) * x + this.b) * x + this.c;
   }
 });
 
 // sum(c[i] * t^i) (i=0..n)
 function Polynomial(coefficients) {
-  this.coefficients = coefficients;
+  var n = coefficients.length - 1;
+  while (n >= 0 && coefficients[n] === 0)
+    --n;
+  this.coefficients = coefficients.slice(0, n + 1);
 }
 Polynomial.resultant = function(f, g) {
   var degree = Math.max(f.degree(), g.degree()),
-      a = f.expandDegree(degree).coefficients,
-      b = g.expandDegree(degree).coefficients;
+      a = f.coefficients, b = g.coefficients;
   function ab(i, j) {
-    return a[i] * b[j] - a[j] * b[i];
+    return (a[i] || 0) * (b[j] || 0) - (a[j] || 0) * (b[i] || 0);
   }
 
   switch (degree) {
@@ -141,31 +146,220 @@ Polynomial.resultant = function(f, g) {
     throw new Error('Only polynomials of 3 or lower degree are supported.');
   }
 }
-var proto = Polynomial.prototype;
-proto.degree = function() {
-  return this.coefficients.length - 1;
-};
-proto.expandDegree = function(degree) {
-  var c = this.coefficients.concat();
-  for (var n = degree - this.degree(); n >= 0; --n)
-    c.push(0);
-  return new Polynomial(c);
-};
-proto.coefficient = function(degree) {
-  return this.coefficients[degree] || 0;
-};
-proto.valueAt = function(t) {
-  var terms = [], degree = this.degree(), c = this.coefficients,
-      i = 0, ti = 1;
-  while (true) {
-    terms.push(c[i] * ti);
-    if (++i > degree)
+mix(Polynomial.prototype, {
+  degree: function degree() {
+    return this.coefficients.length - 1;
+  },
+  derivative: function derivative() {
+    var c = this.coefficients, dc = [];
+    for (i = 1, degree = this.degree(); i <= degree; ++i)
+      dc.push(c[i] * i);
+console.log('derivative: dc=' + JSON.stringify(dc));
+    return new Polynomial(dc);
+  },
+  realRoots: function realRoots(epsilon) {
+    var degree = this.degree(), co = this.coefficients, roots = [];
+console.log('realRoots(). degree=' + degree);
+    switch (degree) {
+    case 0:
+      if (co[0] === 0)
+        throw new Error('Infinite number of roots exist (Any value is ok).');
       break;
-    ti *= t;
-  }
-  return sum(terms);
-};
+    case 1:
+      roots = [-co[0] / co[1]];
+      break;
+    case 2:
+      var a = co[2], b = co[1], c = co[0], d = b * b - 4 * a * c;
+console.log('realRoots(). degree=2 a=' + a + ', b=' + b + ', c=' + c + ', d=' + d);
+      if (d > 0) {
+        var t = -0.5 * (b + sgn(b) * Math.sqrt(d)), x1 = t / a, x2 = c / t;
+        roots = x1 < x2 ? [x1, x2] : [x2, x1];
+      }
+      else if (d === 0)
+        roots = [-0.5 * b / a];
+console.log('realRoots(). degree=2 roots=' + JSON.stringify(roots));
+      break;
+    default:
+// NG
+      var deriv = this.derivative();
+      var xs = deriv.realRoots(epsilon);
+console.log('realRoots(). xs=' + JSON.stringify(xs));
+      var n = xs.length;
+      var ys = [];
+      var sgnYs = [];
+      for (var i = 0; i < n; ++i) {
+        var x = xs[i];
+        var y = ys[i] = this.valueAt(x);
+        if (y === 0)
+          roots.push(x);
+        sgnYs[i] = sgn(y);
+      }
 
+      var ranges = [];
+      var x0, x1, dx, y0, y1, sgnY;
+
+      x1 = xs[0];
+      y1 = ys[0];
+      sgnY = sgnYs[0];
+      dx = 1;
+      x0 = x1 - dx;
+      y0 = this.valueAt(x0);
+      if (sgn(y0 - y1) * sgnY === -1) {
+        while (true) {
+          if (sgn(y0) !== sgnY) {
+            //ranges.push([x0, x1]);
+            break;
+          }
+          x1 = x0;
+          dx *= 2;
+          x0 = x1 - dx;
+          y0 = this.valueAt(x0);
+        }
+      }
+
+      for (var i = 0; i < n - 1; ++i) {
+        if (sgnYs[i] * sgnYs[i + 1] === -1)
+          ranges.push([xs[i], xs[i + 1]]);
+      }
+
+      x0 = xs[n - 1];
+      y0 = ys[n - 1];
+      sgnY = sgnYs[n - 1];
+      dx = 1;
+      x1 = x0 + dx;
+      y1 = this.valueAt(x1);
+      if (sgn(y1 - y0) * sgnY) {
+        while (true) {
+          if (sgn(y1) !== sgnY) {
+            //ranges.push([x0, x1]);
+            break;
+          }
+          x0 = x1;
+          dx *= 2;
+          x1 = x0 + dx;
+          y1 = this.valueAt(x1);
+        }
+      }
+console.log('realRoots() ranges=' + JSON.stringify(ranges));
+
+      var f = bind(this.valueAt, this);
+      var df = bind(deriv.valueAt, deriv);
+      for (var i = 0, nRange = ranges.length; i < nRange; ++i) {
+        var finder = new OneRootFinder(f, df);
+        var range = ranges[i];
+        var root = finder.findOneRootBetween(range[0], range[1]);
+console.log('findOneRoot iter=' + finder.iter);
+        roots.push(root);
+      }
+
+      roots = uniqAndSort(roots);
+
+      break;
+    }
+    return roots;
+  },
+  realRootsBetween: function realRootsBetween(xMin, xMax, epsilon) {
+    if (this.degree() <= 2) {
+      return filterValues(this.realRoots(),
+        function(x) { return xMin <= x && x <= xMax; });
+    }
+    else {
+      var deriv = this.derivative();
+      var derivRoots = deriv.realRootsBetween(xMin, xMax, epsilon);
+console.log('derivRoots=' + JSON.stringify(derivRoots));
+      var xs = uniqAndSort([xMin, xMax].concat(derivRoots));
+      var n = xs.length;
+      var sgnYs = [];
+      var roots = [];
+      for (var i = 0; i < n; ++i) {
+        var x = xs[i];
+        var sgnY = sgnYs[i] = sgn(this.valueAt(x));
+        if (sgnY === 0)
+          roots.push(x);
+      }
+
+      var f = bind(this.valueAt, this);
+      var df = bind(deriv.valueAt, deriv);
+      for (var i = 0; i < n - 1; ++i) {
+        if (sgnYs[i] * sgnYs[i + 1] === -1) {
+          var finder = new OneRootFinder(f, df);
+          var root = finder.findOneRootBetween(xs[i], xs[i + 1]);
+console.log('findOneRoot iter=' + finder.iter);
+          roots.push(root);
+        }
+      }
+
+      return uniqAndSort(roots);
+    }
+  },
+  valueAt: function valueAt(t) {
+    var terms = [], c = this.coefficients, ti = 1;
+    for (var i = 0, degree = this.degree(); i <= degree; ++i) {
+      terms.push(c[i] * ti);
+      ti *= t;
+    }
+    return sum(terms);
+
+    //var s = 0, c = this.coefficients, i = c.length;
+    //while (--i >= 0) {
+    //  s = s * t + c[i];
+    //}
+    //return s;
+  }
+});
+
+function OneRootFinder(func, derivFunc) {
+  this.func = func;
+  this.derivFunc = derivFunc;
+}
+mix(OneRootFinder.prototype, {
+  calcEpsilonFromMinAndMax: function calcEpsilonFromMinAndMax(xMin, xMax) {
+    return MACHINE_EPSILON * (Math.abs(xMin) + Math.abs(xMax)) / 2;
+  },
+  findOneRootBetween: function findOneRootBetween(xMin, xMax, epsilon) {
+    if (epsilon === undefined)
+      epsilon = this.calcEpsilonFromMinAndMax(xMin, xMax);
+    var yAtXMin = this.func(xMin);
+    if (numberEquals(yAtXMin, 0, epsilon))
+      return xMin;
+    var yAtXMax = this.func(xMax);
+    if (numberEquals(yAtXMax, 0, epsilon))
+      return xMax;
+    var sgnYAtXMin = sgn(yAtXMin), sgnYAtXMax = sgn(yAtXMax);
+    if (sgnYAtXMin * sgnYAtXMax >= 0)
+      throw new Error('Values at xMin and xMax have different signs.');
+
+    var xNewton;
+    for (this.iter = 0; this.iter < this.maxIteration; ++this.iter) {
+      var xMid = (xMin + xMax) / 2, yAtXMid = this.func(xMid);
+      if (numberEquals(yAtXMid, 0, epsilon))
+        return xMid;
+
+      if (sgn(yAtXMid) === sgnYAtXMin)
+        xMin = xMid;
+      else
+        xMax = xMid;
+
+      if (xNewton === undefined)
+        xNewton = xMid;
+      xNewton -= this.func(xNewton) / this.derivFunc(xNewton);
+      if (xMid <= xNewton && xNewton <= xMax) {
+        var yAtXNewton = this.func(xNewton);
+        if (numberEquals(yAtXNewton, 0, epsilon))
+          return xNewton;
+
+        if (sgn(yAtXNewton) == sgnYAtXMin)
+          xMin = xNewton;
+        else
+          xMax = xNewton;
+      }
+      else
+        xNewton = undefined;
+    }
+    throw new Error('Maximum number of iterations exceeded.');
+  },
+  maxIteration: 100
+});
 
 function NewtonRaphsonMethod(func, derivFunc) {
   this.func = func;
@@ -176,7 +370,15 @@ mix(NewtonRaphsonMethod.prototype, {
     log('findOneRoot initial guess=' + guess);
     var f = this.func, df = this.derivFunc, i = -1;
     while (++i < this.maxIteration) {
-      var nextGuess = guess - f(guess) / df(guess);
+      var value = f(guess);
+      if (value === 0)
+        return guess;
+
+      var derivValue = df(guess);
+      if (derivValue === 0)
+        throw new Error('A derivative value must not be zero.');
+
+      var nextGuess = guess - value / derivValue;
       log('guess=' + guess + ' next=' + nextGuess);
       if (numberEquals(nextGuess, guess, epsilon))
         return nextGuess;
@@ -1041,6 +1243,17 @@ function filterValues(values, predicate) {
     return values;
 }
 
+function sgn(x) {
+  if (isNaN(x))
+    return NaN;
+  else if (x > 0)
+    return 1;
+  else if (x < 0)
+    return -1;
+  else
+    return 0;
+}
+
 function log() {
   if (console && console.log)
     console.log.apply(console, arguments);
@@ -1075,11 +1288,13 @@ return {
   bind: bind,
   numberEquals: numberEquals,
   sum: sum,
+  sgn: sgn,
   uniq: uniq,
   uniqAndSort: uniqAndSort,
   filterValues: filterValues,
   integral: integral,
   sortBy: sortBy,
+  OneRootFinder: OneRootFinder,
   QuadraticEquation: QuadraticEquation,
   CubicEquation: CubicEquation,
   Polynomial: Polynomial,
