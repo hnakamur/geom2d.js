@@ -3,6 +3,10 @@ var numeric = function() {
 // References:
 // [1] What Every Computer Scientist Should Know About Floating-Point Arithmetic
 //     http://docs.sun.com/source/806-3568/ncg_goldberg.html
+// [2] Numerical Recipe 3rd ed. (ISBN: 978-0-521-88068-8)
+//     NOTE: To avoid copyright violation, I never looked at source codes in
+//           this book. I read only explanations of algorithms.
+//           All implementations in this source code are all my own works.
 
 var MACHINE_EPSILON = 2.220446049250313e-16;
 
@@ -17,42 +21,27 @@ mix(QuadraticEquation.prototype, {
     return sum([this.a * x * x, this.b * x, this.c]);
     //return (this.a * x + this.b) * x + this.c; <- this is unstable.
   },
-  derivativeValueAt: function derivativeValueAt(x) {
-    return 2 * this.a * x + this.b;
-  },
   realRoots: function realRoots(predicate) {
     // http://en.wikipedia.org/wiki/Quadratic_equation
-    var roots;
-    if (this.a) {
-      var dis = this.discriminant();
-  //log('a=' + this.a + ', b=' + this.b + ', c=' + this.c + ', dis=' + dis);
+    var a = this.a, b = this.b, c = this.c;
+    var roots = [];
+    if (a !== 0) {
+      var dis = b * b - 4 * a * c;
       if (dis > 0) {
-        var a = this.a, b = this.b, c = this.c,
-            sgnB = sgn(b),
-            t = -0.5 * (b + sgnB * Math.sqrt(dis)),
-            x1 = t / a,
-            x2 = c / t;
-            //y1 = this.valueAt(x1),
-            //y2 = this.valueAt(x2);
-  //log('x1=' + x1 + ', x2=' + x2);
-        //x1 = -0.5 * (b + Math.sqrt(dis));
-        //x2 = -0.5 * (b - Math.sqrt(dis));
+        var t = -0.5 * (b + sgn(b) * Math.sqrt(dis)), x1 = t / a, x2 = c / t;
         roots = x1 < x2 ? [x1, x2] : [x2, x1];
       }
       else if (dis === 0)
-        roots = [-0.5 * this.b / this.a];
+        roots = [-0.5 * b / a];
       else
         roots = [];
     }
-    else if (this.b)
-      roots = [-this.c / this.b];
-    else
-      roots = [];
+    else if (b !== 0)
+      roots = [-c / b];
+    else if (c === 0)
+      throw new Error('Infinite number of roots exist (Any value is ok).');
 
     return predicate ? filterValues(roots, predicate) : roots;
-  },
-  discriminant: function discriminant() {
-    return this.b * this.b - 4 * this.a * this.c;
   }
 });
 
@@ -157,110 +146,10 @@ mix(Polynomial.prototype, {
 console.log('derivative: dc=' + JSON.stringify(dc));
     return new Polynomial(dc);
   },
-  realRoots: function realRoots(epsilon) {
-    var degree = this.degree(), co = this.coefficients, roots = [];
-console.log('realRoots(). degree=' + degree);
-    switch (degree) {
-    case 0:
-      if (co[0] === 0)
-        throw new Error('Infinite number of roots exist (Any value is ok).');
-      break;
-    case 1:
-      roots = [-co[0] / co[1]];
-      break;
-    case 2:
-      var a = co[2], b = co[1], c = co[0], d = b * b - 4 * a * c;
-console.log('realRoots(). degree=2 a=' + a + ', b=' + b + ', c=' + c + ', d=' + d);
-      if (d > 0) {
-        var t = -0.5 * (b + sgn(b) * Math.sqrt(d)), x1 = t / a, x2 = c / t;
-        roots = x1 < x2 ? [x1, x2] : [x2, x1];
-      }
-      else if (d === 0)
-        roots = [-0.5 * b / a];
-console.log('realRoots(). degree=2 roots=' + JSON.stringify(roots));
-      break;
-    default:
-// NG
-      var deriv = this.derivative();
-      var xs = deriv.realRoots(epsilon);
-console.log('realRoots(). xs=' + JSON.stringify(xs));
-      var n = xs.length;
-      var ys = [];
-      var sgnYs = [];
-      for (var i = 0; i < n; ++i) {
-        var x = xs[i];
-        var y = ys[i] = this.valueAt(x);
-        if (y === 0)
-          roots.push(x);
-        sgnYs[i] = sgn(y);
-      }
-
-      var ranges = [];
-      var x0, x1, dx, y0, y1, sgnY;
-
-      x1 = xs[0];
-      y1 = ys[0];
-      sgnY = sgnYs[0];
-      dx = 1;
-      x0 = x1 - dx;
-      y0 = this.valueAt(x0);
-      if (sgn(y0 - y1) * sgnY === -1) {
-        while (true) {
-          if (sgn(y0) !== sgnY) {
-            //ranges.push([x0, x1]);
-            break;
-          }
-          x1 = x0;
-          dx *= 2;
-          x0 = x1 - dx;
-          y0 = this.valueAt(x0);
-        }
-      }
-
-      for (var i = 0; i < n - 1; ++i) {
-        if (sgnYs[i] * sgnYs[i + 1] === -1)
-          ranges.push([xs[i], xs[i + 1]]);
-      }
-
-      x0 = xs[n - 1];
-      y0 = ys[n - 1];
-      sgnY = sgnYs[n - 1];
-      dx = 1;
-      x1 = x0 + dx;
-      y1 = this.valueAt(x1);
-      if (sgn(y1 - y0) * sgnY) {
-        while (true) {
-          if (sgn(y1) !== sgnY) {
-            //ranges.push([x0, x1]);
-            break;
-          }
-          x0 = x1;
-          dx *= 2;
-          x1 = x0 + dx;
-          y1 = this.valueAt(x1);
-        }
-      }
-console.log('realRoots() ranges=' + JSON.stringify(ranges));
-
-      var f = bind(this.valueAt, this);
-      var df = bind(deriv.valueAt, deriv);
-      for (var i = 0, nRange = ranges.length; i < nRange; ++i) {
-        var finder = new OneRootFinder(f, df);
-        var range = ranges[i];
-        var root = finder.findOneRootBetween(range[0], range[1]);
-console.log('findOneRoot iter=' + finder.iter);
-        roots.push(root);
-      }
-
-      roots = uniqAndSort(roots);
-
-      break;
-    }
-    return roots;
-  },
   realRootsBetween: function realRootsBetween(xMin, xMax, epsilon) {
     if (this.degree() <= 2) {
-      return filterValues(this.realRoots(),
+      var c = this.coefficients;
+      return new QuadraticEquation(c[2], c[1], c[0]).realRoots(
         function(x) { return xMin <= x && x <= xMax; });
     }
     else {
@@ -283,7 +172,7 @@ console.log('derivRoots=' + JSON.stringify(derivRoots));
       for (var i = 0; i < n - 1; ++i) {
         if (sgnYs[i] * sgnYs[i + 1] === -1) {
           var finder = new OneRootFinder(f, df);
-          var root = finder.findOneRootBetween(xs[i], xs[i + 1]);
+          var root = finder.findOneRootBetween(xs[i], xs[i + 1], epsilon);
 console.log('findOneRoot iter=' + finder.iter);
           roots.push(root);
         }
@@ -317,6 +206,7 @@ mix(OneRootFinder.prototype, {
     return MACHINE_EPSILON * (Math.abs(xMin) + Math.abs(xMax)) / 2;
   },
   findOneRootBetween: function findOneRootBetween(xMin, xMax, epsilon) {
+console.log('findOneRootBetween(): epsilon=' + epsilon);
     if (epsilon === undefined)
       epsilon = this.calcEpsilonFromMinAndMax(xMin, xMax);
     var yAtXMin = this.func(xMin);
@@ -325,13 +215,17 @@ mix(OneRootFinder.prototype, {
     var yAtXMax = this.func(xMax);
     if (numberEquals(yAtXMax, 0, epsilon))
       return xMax;
+console.log('findOneRootBetween(): yAtXMin=' + yAtXMin + ', yAtXMax=' + yAtXMax);
     var sgnYAtXMin = sgn(yAtXMin), sgnYAtXMax = sgn(yAtXMax);
     if (sgnYAtXMin * sgnYAtXMax >= 0)
-      throw new Error('Values at xMin and xMax have different signs.');
+      throw new Error('Values at xMin and xMax must have different signs.');
 
-    var xNewton;
+    var xNewton, yAtXNewton;
     for (this.iter = 0; this.iter < this.maxIteration; ++this.iter) {
+console.log('findOneRootBetween(): xMin=' + xMin + ', xMax=' + xMax);
+      // First, we proceed one step with the bisection method.
       var xMid = (xMin + xMax) / 2, yAtXMid = this.func(xMid);
+console.log('findOneRootBetween(): yAtXMid=' + yAtXMid);
       if (numberEquals(yAtXMid, 0, epsilon))
         return xMid;
 
@@ -339,12 +233,34 @@ mix(OneRootFinder.prototype, {
         xMin = xMid;
       else
         xMax = xMid;
+console.log('findOneRootBetween(): after bisection xMin=' + xMin + ', xMax=' + xMax);
 
-      if (xNewton === undefined)
+      // We use the middle point as the starting point of the Newton method
+      // in cases:
+      // 1) in the first iteration, 2) the previous result with the Newton
+      // method was out of the range determined by the bisection method.
+      //
+      // Otherwise, the previous result with the Newton method was in the
+      // range, we use that point.
+      if (xNewton === undefined) {
         xNewton = xMid;
-      xNewton -= this.func(xNewton) / this.derivFunc(xNewton);
-      if (xMid <= xNewton && xNewton <= xMax) {
-        var yAtXNewton = this.func(xNewton);
+        yAtXNewton = yAtXMid;
+      }
+
+      // Now, we proceed one step with the Newton method. If the result
+      // is in the range determined with the bisection, we use it to narrow
+      // the range. Otherwise, we discard it.
+      //
+      // Note we do not need to check the derivative value is zero.
+      // In that case, the value of the division below will be one of NaN,
+      // Infinity, and -Infinity. The result with the Newton method will be
+      // out of the range determined with the bisection, and hence will
+      // be discarded.
+      xNewton -= yAtXNewton / this.derivFunc(xNewton);
+console.log('findOneRootBetween(): xNewton=' + xNewton);
+      if (xMin <= xNewton && xNewton <= xMax) {
+        yAtXNewton = this.func(xNewton);
+console.log('findOneRootBetween(): yAtXNewton=' + yAtXNewton);
         if (numberEquals(yAtXNewton, 0, epsilon))
           return xNewton;
 
@@ -352,6 +268,7 @@ mix(OneRootFinder.prototype, {
           xMin = xNewton;
         else
           xMax = xNewton;
+//console.log('findOneRootBetween(): after newton xMin=' + xMin + ', xMax=' + xMax);
       }
       else
         xNewton = undefined;

@@ -189,10 +189,47 @@ mix(QuadraticBezier.prototype, {
     if (isNaN(t)) {
       t = -sum([b1 * x, -a1 * y, a1 * b0 - a0 * b1]) /
         sum([b2 * x, -a2 * y, a2 * b0 - a0 * b2]);
-      if (isNaN(t)) {
-      }
     }
     return t;
+  },
+  tPairsAtIntersections: function tPairsAtIntersections(bezier) {
+    var tc = this.coefficients();
+    var a0 = tc[0].x, a1 = tc[1].x, a2 = tc[2].x;
+    var b0 = tc[0].y, b1 = tc[1].y, b2 = tc[2].y;
+    var a2b1 = a2 * b1 - a1 * b2;
+    var a2b0 = a2 * b0 - a0 * b2;
+    var a1b0 = a1 * b0 - a0 * b1;
+    // implicitized curve 1: a*x^2 + b*x*y + c*y^2 + d*x + e*y + f = 0
+    var a = -b2 * b2;
+    var b = 2 * a2 * b2;
+    var c = -a2 * a2;
+    var d = b1 * a2b1 - 2 * b2 * a2b0;
+    var e = -a1 * a2b1 + 2 * a2 * a2b0;
+    var f = a2b1 * a1b0 - a2b0 * a2b0;
+
+    var bc = bezier.coefficients();
+    var c0 = bc[0].x, c1 = bc[1].x, c2 = bc[2].x;
+    var d0 = bc[0].y, d1 = bc[1].y, d2 = bc[2].y;
+
+    var poly = new numeric.Polynomial([
+      a*c0*c0+b*c0*d0+c*d0*d0+d*c0+e*d0+f,
+      2*a*c0*c1+b*(c1*d0+c0*d1)+2*c*d0*d1+d*c1+e*d1,
+      a*(2*c0*c2+c1*c1)+b*(c2*d0+c0*d2+c1*d1)+c*(2*d0*d2+d1*d1)+d*c2+e*d2,
+      2*a*c1*c2+b*(c2*d1+c1*d2)+2*c*d1*d2,
+      a*c2*c2+b*c2*d2+c*d2*d2
+    ]);
+    console.log('poly.coefficients=' + JSON.stringify(poly.coefficients));
+    var us = poly.realRootsBetween(0, 1, 1e-3);
+    console.log('us=' + JSON.stringify(us));
+
+    var tPairs = [];
+    for (var i = 0, n = us.length; i < n; ++i) {
+      var u = us[i];
+      var p = bezier.pointAtT(u);
+      var t = this.tAtXY(p.x, p.y);
+      tPairs.push([t, u]);
+    }
+    return tPairs;
   },
   tsAtX: function tsAtX(x) {
     var c = this.coefficients;

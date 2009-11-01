@@ -1,0 +1,120 @@
+<html>
+<head>
+<title>Quadratic Bezier curve-curve intersection</title>
+<style type="text/css">
+@import "../lib/jquery.svg/jquery.svg.css";
+
+#svg1 { width: 1000px; height: 800px; border: 1px solid #000; }
+</style>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.js"></script>
+<script type="text/javascript" src="../lib/jquery.svg/jquery.svg.js"></script>
+<script type="text/javascript" src="../lib/json2.js"></script>
+<script type="text/javascript" src="../src/numeric.js"></script>
+<script type="text/javascript" src="../src/geom2d.js"></script>
+<script type="text/javascript">
+$(function() {
+
+  function drawBezier(svg, xyArray) {
+    var ps = geom2d.Vector2d.vectorsFromNestedXYArray(xyArray);
+    var path = svg.createPath().
+      move(ps[0].x, ps[0].y).
+      curveQ(ps[1].x, ps[1].y, ps[2].x, ps[2].y);
+    svg.path(path, {fill: 'none', stroke: '#0f0'});
+  }
+
+  function drawLine(svg, line, color) {
+    svg.line(line.p0.x, line.p0.y, line.p1.x, line.p1.y,
+      {fill: 'none', stroke: color});
+    drawPoint(svg, line.p1, color);
+  }
+
+  function drawSegmentPairs(svg, segmentPairs) {
+    for (var i = 0, n = segmentPairs.length; i < n; ++i) {
+      var segmentPair = segmentPairs[i];
+      var seg1 = segmentPair[0];
+      var seg2 = segmentPair[1];
+      drawLine(svg, seg1.toLine(), '#c0c');
+      drawLine(svg, seg2.toLine(), '#880');
+    }
+  }
+
+  function drawPoint(svg, point, r, stroke) {
+    svg.circle(point.x, point.y, r, {fill: 'none', stroke: stroke, opaque:0.5});
+  }
+
+  function logCoefficients(bezier) {
+    var cs = bezier.coefficients();
+    for (var i = 0, n = cs.length; i < n; ++i) {
+      var c = cs[i];
+      console.log('coefficient[' + i + ']=' + c);
+    }
+  }
+
+  function drawInitial(svg) {
+    var cp1 = [[300, 10], [800, 500], [50, 100]];
+    drawBezier(svg, cp1);
+    var ps1 = geom2d.Vector2d.vectorsFromNestedXYArray(cp1);
+    var bezier1 = new geom2d.QuadraticBezier(ps1[0], ps1[1], ps1[2]);
+    logCoefficients(bezier1);
+
+    var cp2 = [[200, 200], [400, -150], [450, 300]];
+    drawBezier(svg, cp2);
+    var ps2 = geom2d.Vector2d.vectorsFromNestedXYArray(cp2);
+    var bezier2 = new geom2d.QuadraticBezier(ps2[0], ps2[1], ps2[2]);
+    logCoefficients(bezier2);
+
+    var tPairs = bezier1.tPairsAtIntersections(bezier2);
+    for (var i = 0, n = tPairs.length; i < n; ++i) {
+      var tPair = tPairs[i];
+      var t = tPair[0], u = tPair[1];
+      var p = bezier1.pointAtT(t);
+      drawPoint(svg, p, 0.5, '#f00');
+      var q = bezier2.pointAtT(u);
+      drawPoint(svg, q, 0.5, '#00f');
+
+      console.log('i=' + i + ', offset=' + p.subtract(q).length());
+    }
+  }
+
+	$('#svg1').svg({onLoad: drawInitial});
+});
+</script>
+</head>
+<body>
+<h3>Quadratic Bezier curve-curve intersection</h1>
+<div id="svg1"></div>
+<pre>
+curve 1: x=a2*t^2+a1*t+a0, y=b2*t^2+b1*t+b0
+implicitization:
+p(x, t) = a2*t^2+a1*t+(a0-x)
+q(y, t) = b2*t^2+b1*t+(b0-y)
+         
+f(x, y)
+ = |a2*b1-a1*b2         a2*(b0-y)-(a0-x)*b2|
+   |a2*(b0-y)-(a0-x)*b2 a1*(b0-y)-(a0-x)*b1|
+ = (a2*b1-a1*b2)*(a1*(b0-y)-(a0-x)*b1)-(a2*(b0-y)-(a0-x)*b2)^2
+ = (a2*b1-a1*b2)*(b1*x+a1*y+a1*b0-a0*b1)-(b2*x-a2*y+a2*b0-a0*b2)^2
+ = -b2^2*x^2+2*a2*b2*x*y-a2^2*y^2
+  +(b1*(a2*b1-a1*b2)-2*b2*(a2*b0-a0*b2))*x
+  +(a1*(a2*b1-a1*b2)+2*a2*(a2*b0-a0*b2))*y
+  +(a2*b1-a1*b2)*(a1*b0-a0*b1)-(a2*b0-a0*b2)^2
+ = A*x^2+B*x*y+C*y^2+D*x+E*y+F
+
+curve 2: x=c2*u^2+c1*u+c0, y=d2*u^2+d1*u+d0
+f(x(u), y(u))
+ = A*(c2*u^2+c1*u+c0)^2+B*(c2*u^2+c1*u+c0)*(d2*u^2+d1*u+d0)
+  +C*(d2*u^2+d1*u+d0)^2+D*(c2*u^2+c1*u+c0)+E*(d2*u^2+d1*u+d0)+F
+ = A*(c2^2*u^4+2*c1*c2*u^3+(2*c0*c2+c1^2)*u^2+2*c0*c1*u+c0^2)
+  +B*(c2*d2*u^4+(c2*d1+c1*d2)*u^3+(c2*d0+c0*d2+c1*d1)*u^2+(c1*d0+c0*d1)*u+c0*d0)
+  +C*(d2^2*u^4+2*d1*d2*u^3+(2*d0*d2+d1^2)*u^2+2*d0*d1*u+d0^2)
+  +D*(c2*u^2+c1*u+c0)+E*(d2*u^2+d1*u+d0)+F
+ = (A*c2^2+B*c2*d2+C*d2^2)*u^4
+  +(2*A*c1*c2+B*(c2*d1+c1*d2)+2*C*d1*d2)*u^3
+  +(A*(2*c0*c2+c1^2)+B*(c2*d0+c0*d2+c1*d1)+C*(2*d0*d2+d1^2)+D*c2+E*d2)*u^2
+  +(2*A*c0*c1+B*(c1*d0+c0*d1)+2*C*d0*d1+D*c1+E*d1)*u
+  +(A*c0^2+B*c0*d0+C*d0^2+D*c0+E*d0+F)
+
+
+</pre>
+</body>
+</html>
