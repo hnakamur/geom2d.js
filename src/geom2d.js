@@ -199,7 +199,37 @@ mix(QuadraticBezier.prototype, {
     var a2b1 = a2 * b1 - a1 * b2;
     var a2b0 = a2 * b0 - a0 * b2;
     var a1b0 = a1 * b0 - a0 * b1;
-    // implicitized curve 1: a*x^2 + b*x*y + c*y^2 + d*x + e*y + f = 0
+
+    // curve 1: x=a2*t^2+a1*t+a0, y=b2*t^2+b1*t+b0
+    // implicitization:
+    // p(x, t) = a2*t^2+a1*t+(a0-x)
+    // q(y, t) = b2*t^2+b1*t+(b0-y)
+    //          
+    // f(x, y)
+    //  = |a2*b1-a1*b2         a2*(b0-y)-(a0-x)*b2|
+    //    |a2*(b0-y)-(a0-x)*b2 a1*(b0-y)-(a0-x)*b1|
+    //  = (a2*b1-a1*b2)*(a1*(b0-y)-(a0-x)*b1)-(a2*(b0-y)-(a0-x)*b2)^2
+    //  = (a2*b1-a1*b2)*(b1*x+a1*y+a1*b0-a0*b1)-(b2*x-a2*y+a2*b0-a0*b2)^2
+    //  = -b2^2*x^2+2*a2*b2*x*y-a2^2*y^2
+    //   +(b1*(a2*b1-a1*b2)-2*b2*(a2*b0-a0*b2))*x
+    //   +(a1*(a2*b1-a1*b2)+2*a2*(a2*b0-a0*b2))*y
+    //   +(a2*b1-a1*b2)*(a1*b0-a0*b1)-(a2*b0-a0*b2)^2
+    //  = A*x^2+B*x*y+C*y^2+D*x+E*y+F
+    // 
+    // curve 2: x=c2*u^2+c1*u+c0, y=d2*u^2+d1*u+d0
+    // f(x(u), y(u))
+    //  = A*(c2*u^2+c1*u+c0)^2+B*(c2*u^2+c1*u+c0)*(d2*u^2+d1*u+d0)
+    //   +C*(d2*u^2+d1*u+d0)^2+D*(c2*u^2+c1*u+c0)+E*(d2*u^2+d1*u+d0)+F
+    //  = A*(c2^2*u^4+2*c1*c2*u^3+(2*c0*c2+c1^2)*u^2+2*c0*c1*u+c0^2)
+    //   +B*(c2*d2*u^4+(c2*d1+c1*d2)*u^3+(c2*d0+c0*d2+c1*d1)*u^2+(c1*d0+c0*d1)*u+c0*d0)
+    //   +C*(d2^2*u^4+2*d1*d2*u^3+(2*d0*d2+d1^2)*u^2+2*d0*d1*u+d0^2)
+    //   +D*(c2*u^2+c1*u+c0)+E*(d2*u^2+d1*u+d0)+F
+    //  = (A*c2^2+B*c2*d2+C*d2^2)*u^4
+    //   +(2*A*c1*c2+B*(c2*d1+c1*d2)+2*C*d1*d2)*u^3
+    //   +(A*(2*c0*c2+c1^2)+B*(c2*d0+c0*d2+c1*d1)+C*(2*d0*d2+d1^2)+D*c2+E*d2)*u^2
+    //   +(2*A*c0*c1+B*(c1*d0+c0*d1)+2*C*d0*d1+D*c1+E*d1)*u
+    //   +(A*c0^2+B*c0*d0+C*d0^2+D*c0+E*d0+F)
+
     var a = -b2 * b2;
     var b = 2 * a2 * b2;
     var c = -a2 * a2;
@@ -218,9 +248,9 @@ mix(QuadraticBezier.prototype, {
       2*a*c1*c2+b*(c2*d1+c1*d2)+2*c*d1*d2,
       a*c2*c2+b*c2*d2+c*d2*d2
     ]);
-    console.log('poly.coefficients=' + JSON.stringify(poly.coefficients));
-    var us = poly.realRootsBetween(0, 1, 1e-3);
-    console.log('us=' + JSON.stringify(us));
+    //console.log('poly.coefficients=' + JSON.stringify(poly.coefficients));
+    var us = poly.realRootsBetween(0, 1/*, 1e-4*/);
+    //console.log('us=' + JSON.stringify(us));
 
     var tPairs = [];
     for (var i = 0, n = us.length; i < n; ++i) {
@@ -486,6 +516,170 @@ mix(Bezier.prototype, {
       this._segments = segments;
     }
     return this._segments;
+  },
+  toImplicitFunction: function toImplicitFunction() {
+    if (this.degree() !== 3)
+      throw new Error('Not implemented for degrees other than 3.');
+  // implicitization:
+  // p(x, t) = a3*t^3+a2*t^2+a1*t+(a0-x)
+  // q(y, t) = b3*t^3+b2*t^2+b1*t+(b0-y)
+  //
+  // f(x, y)
+  //   |a3*b2-a2*b3         a3*b1-a1*b3                     a3*(b0-y)-(a0-x)*b3|
+  // = |a3*b1-a1*b3         a3*(b0-y)-(a0-x)*b3+a2*b1-a1*b2 a2*(b0-y)-(a0-x)*b2|
+  //   |a3*(b0-y)-(a0-x)*b3 a2*(b0-y)-(a0-x)*b2             a1*(b0-y)-(a0-x)*b1|
+  //
+  // c32 = a3*b2-a2*b3
+  // c31 = a3*b1-a1*b3
+  // c30 = a3*b0-a0*b3
+  // c21 = a2*b1-a1*b2
+  // c20 = a2*b0-a0*b2
+  // c10 = a1*b0-a0*b1
+  // z3 = b3*x-a3*y
+  // z2 = b2*x-a2*y
+  // z1 = b1*x-a1*y
+  //
+  // f(x, y)
+  //   |c32    c31        z3+c30|
+  // = |c31    z3+c30+c21 z2+c20|
+  //   |z3+c30 z2+c20     z1+c10|
+  //
+  // |a b c|
+  // |d e f| = a*e*i − a*f*h + b*f*g − b*d*i + c*d*h − c*e*g
+  // |g h i|
+  //
+  // |a b c|
+  // |b e f| = a*e*i − a*f^2 + b*f*c − b^2*i + c*b*f − c^2*e
+  // |c f i|
+  //  = a*e*i + a*f^2 + 2*b*c*f - b^2*i - c^2*e
+  // a*e*i = c32*(z3+c30+c21)*(z1+c10)
+  //       = c32*(z3*z1+c10*z3+(c30+c21)*z1+(c30+c21)*c10)
+  //       = c32*z3*z1 +c32*c10*z3 +c32*(c30+c21)*z1 +c32*(c30+c21)*c10
+  // a*f^2 = c32*(z2+c20)^2
+  //       = c32*(z2^2+2*c20*z2+c20^2)
+  //       = c32*z2^2 +2*c32*c20*z2 +c32*c20^2
+  // 2*b*c*f = 2*c31*(z3+c30)*(z2+c20)
+  //         = 2*c31*(z3*z2+c20*z3+c30*z2+c30*c20)
+  //         = 2*c31*z3*z2 +2*c31*c20*z3 +2*c31*c30*z2 +2*c31*c30*c20
+  // -b^2*i = -c31^2*(z1+c10)
+  //        = -c31^2*z1 -c31^2*c10
+  // -c^2*e = -(z3+c30)^2*(z3+c30+c21)
+  //        = -(z3^2+2*c30*z3+c30^2)*(z3+c30+c21)
+  //        = -z3^3 -(3*c30+c21)*z3^2 -c30*(3*c30+2*c21)*z3 -c30^2*(c30+c21)
+  // f(x, y)
+  // = -z3^3
+  //   +(c32*z3*z1+c32*z2^2+2*c31*z3*z2-3*c30*z3^2)
+  //   +(c32*c10+2*c31*c20-c30*(3*c30+c21))*z3
+  //   +2*(c32*c20+c31*c30)*z2
+  //   +(c32*(c30+c21)-c31^2)*z1
+  //   +c32*(c30+c21)*c10+c32*c20^2+2*c31*c30*c20-c31^2*c10-c30^2*(c30+c21)
+  //
+  // -z3^3 = -(b3*x-a3*y)^3
+  //       = -b3^3*x^3+3*b3^2*a3*x^2*y-3*b3*a3^2*x*y^2+a3^3*y^3
+  //
+  // +(c32*z3*z1+c32*z2^2+2*c31*z3*z2-(3*c30+c21)*z3^2)
+  // = c32*(b3*x-a3*y)*(b1*x-a1*y)
+  //  +c32*(b2*x-a2*y)^2
+  //  +2*c31*(b3*x-a3*y)*(b2*x-a2*y)
+  //  -(3*c30+c21)*(b3*x-a3*y)^2
+  // = c32*b3*b1*x^2 -c32*(a1*b3+a3*b1)*x*y + c32*a3*a1*y^2
+  //  +c32*b2^2*x^2 -2*c32*b2*a2*x*y +c32*a2^2*y^2
+  //  +2*c31*b3*b2*x^2 -2*c31*(a2*b3+a3*b2)*x*y +2*c31*a3*a2*y^2
+  //  -(3*c30+c21)*b3^2*x^2 +2*(3*c30+c21)*b3*a3*x*y -(3*c30+c21)*a3^2*y^2
+  // = (c32*b3*b1+c32*b2^2+2*c31*b3*b2-(3*c30+c21)*b3^2)*x^2
+  //  +(-c32*(a1*b3+a3*b1)-2*c32*b2*a2-2*c31*(a2*b3+a3*b2)+2*(3*c30+c21)*b3*a3)*x*y
+  //  +(c32*a3*a1+c32*a2^2+2*c31*a3*a2-(3*c30+c21)*a3^2)*y^2
+  //
+  // +(c32*c10+2*c31*c20-c30*(3*c30+2*c21))*z3
+  // +2*(c32*c20+c31*c30)*z2
+  // +(c32*(c30+c21)-c31^2)*z1
+  // = (c32*c10+2*c31*c20-c30*(3*c30+2*c21))*(b3*x-a3*y)
+  //  +2*(c32*c20+c31*c30)*(b2*x-a3*y)
+  //  +(c32*(c30+c21)-c31^2)*(b1*x-a1*y)
+  // = (b3*(c32*c10+2*c31*c20-c30*(3*c30+2*c21))
+  //    +2*b2*(c32*c20+c31*c30)
+  //    +b1*(c32*(c30+c21)-c31^2))*x
+  //  -(a3*(c32*c10+2*c31*c20-c30*(3*c30+2*c21))
+  //    +2*a2*(c32*c20+c31*c30)
+  //    +a1*(c32*(c30+c21)-c31^2))*y
+  //
+  // f(x, y)
+  // = -b3^3*x^3+3*b3^2*a3*x^2*y-3*b3*a3^2*x*y^2+a3^3*y^3
+  //  +(c32*b3*b1+c32*b2^2+2*c31*b3*b2-(3*c30+c21)*b3^2)*x^2
+  //  +(-c32*(a1*b3+a3*b1)-2*c32*b2*a2-2*c31*(a2*b3+a3*b2)+2*(3*c30+c21)*b3*a3)*x*y
+  //  +(c32*a3*a1+c32*a2^2+2*c31*a3*a2-(3*c30+c21)*a3^2)*y^2
+  //  +(b3*(c32*c10+2*c31*c20-c30*(3*c30+2*c21))
+  //    +2*b2*(c32*c20+c31*c30)
+  //    +b1*(c32*(c30+c21)-c31^2))*x
+  //  -(a3*(c32*c10+2*c31*c20-c30*(3*c30+2*c21))
+  //    +2*a2*(c32*c20+c31*c30)
+  //    +a1*(c32*(c30+c21)-c31^2))*y
+  //  +c32*(c30+c21)*c10+c32*c20^2+2*c31*c30*c20-c31^2*c10-c30^2*(c30+c21)
+
+  // a = -b3^3
+  // b = 3*a3*b3^2
+  // c = -3*a3^2*b3
+  // d = a3^3
+  // e = c32*b3*b1+c32*b2^2+2*c31*b3*b2-(3*c30+c21)*b3^2
+  // f = -c32*(a1*b3+a3*b1)-2*c32*b2*a2-2*c31*(a2*b3+a3*b2)+2*(3*c30+c21)*b3*a3
+  // g = c32*a3*a1+c32*a2^2+2*c31*a3*a2-(3*c30+c21)*a3^2
+  // h = b3*m+b2*n+b1*o
+  // i = -(a3*m+a2*n+a1*o)
+  // j = +c32*(c30+c21)*c10+c32*c20^2+2*c31*c30*c20-c31^2*c10-c30^2*(c30+c21)
+
+  // m = (c32*c10+2*c31*c20-c30*(3*c30+2*c21))
+  // n = 2*(c32*c20+c31*c30)
+  // o = (c32*(c30+c21)-c31^2)
+
+    var tc = this.coefficients();
+for (var i = 0; i < tc.length; ++i) console.log('tc[' + i + ']=' + tc[i]);
+    var a0 = tc[0].x, a1 = tc[1].x, a2 = tc[2].x, a3 = tc[3].x;
+    var b0 = tc[0].y, b1 = tc[1].y, b2 = tc[2].y, b3 = tc[3].y;
+    var c32 = a3 * b2 - a2 * b3;
+console.log('a3*b2=' + a3 * b2);
+console.log('a2*b3=' + a2 * b3);
+console.log('c32=' + c32);
+    var c31 = a3 * b1 - a1 * b3;
+console.log('a3*b1=' + a3 * b1);
+console.log('a1*b3=' + a1 * b3);
+console.log('c31=' + c31);
+    var c30 = a3 * b0 - a0 * b3;
+console.log('a3*b0=' + a3 * b0);
+console.log('a0*b3=' + a0 * b3);
+console.log('c30=' + c30);
+    var c21 = a2 * b1 - a1 * b2;
+console.log('a2*b1=' + a2 * b1);
+console.log('a1*b2=' + a1 * b2);
+console.log('c21=' + c21);
+    var c20 = a2 * b0 - a0 * b2;
+console.log('a2*b0=' + a2 * b0);
+console.log('a0*b2=' + a0 * b2);
+console.log('c20=' + c20);
+    var c10 = a1 * b0 - a0 * b1;
+console.log('a1*b0=' + a1 * b0);
+console.log('a0*b1=' + a0 * b1);
+console.log('c10=' + c10);
+
+    var m = sum([c32*c10, +2*c31*c20, -c30*(3*c30+2*c21)]);
+    var n = 2*(c32*c20+c31*c30);
+    var o = (c32*(c30+c21)-c31*c31);
+
+    var a = -b3*b3*b3;
+    var b = 3*a3*b3*b3;
+    var c = -3*a3*a3*b3;
+    var d = a3*a3*a3;
+    var e = sum([c32*b3*b1, +c32*b2*b2, +2*c31*b3*b2, -(3*c30+c21)*b3*b3]);
+    var f = sum([-c32*(a1*b3+a3*b1), -2*c32*b2*a2, -2*c31*(a2*b3+a3*b2), +2*(3*c30+c21)*b3*a3]);
+    var g = sum([c32*a3*a1, +c32*a2*a2, +2*c31*a3*a2, -(3*c30+c21)*a3*a3]);
+    var h = sum([b3*m, +b2*n, +b1*o]);
+    var i = -sum([a3*m, +a2*n, +a1*o]);
+    var j = sum([c32*(c30+c21)*c10, c32*c20*c20, 2*c31*c30*c20, -c31*c31*c10, -c30*c30*(c30+c21)]);
+    return function(x, y) {
+  // f(x, y)
+  // = a*x^3+b*x^2*y+c*x*y^2+d*y^3+e*x^2+f*x*y+g*y^2+h*x+i*y+j
+      var x2 = x * x, y2 = y * y, x3 = x2 * x, y3 = y2 * y;
+      return sum([a*x3, b*x2*y, c*x*y2, d*y3, e*x2, f*x*y, g*y2, h*x, i*y, j]);
+    }
   }
 });
 
@@ -522,7 +716,7 @@ mix(BezierIntersectionBBoxAlgorithm.prototype, {
       segmentPairs = this.processSegmentPairs(segmentPairs);
       ++this.iterationCount;
     }
-console.log('iterationCount=' + this.iterationCount);
+//console.log('iterationCount=' + this.iterationCount);
     return this.points;
   },
   calcInitialSegmentPairs: function calcInitialSegmentPairs() {
@@ -658,6 +852,159 @@ mix(BezierSegment.prototype, {
   }
 });
 
+function BezierIntersectionImplicitizationAlgorithm(bezier1, bezier2) {
+  this.bezier1 = bezier1;
+  this.bezier2 = bezier2;
+}
+mix(BezierIntersectionImplicitizationAlgorithm, {
+  execute: function execute(bezier1, bezier2) {
+    return new BezierIntersectionImplicitizationAlgorithm(bezier1, bezier2).
+      execute();
+  }
+});
+mix(BezierIntersectionImplicitizationAlgorithm.prototype, {
+    // curve 1: x=a2*t^2+a1*t+a0, y=b2*t^2+b1*t+b0
+    // implicitization:
+    // p(x, t) = a2*t^2+a1*t+(a0-x)
+    // q(y, t) = b2*t^2+b1*t+(b0-y)
+    //          
+    // f(x, y)
+    //  = |a2*b1-a1*b2         a2*(b0-y)-(a0-x)*b2|
+    //    |a2*(b0-y)-(a0-x)*b2 a1*(b0-y)-(a0-x)*b1|
+    //  = (a2*b1-a1*b2)*(a1*(b0-y)-(a0-x)*b1)-(a2*(b0-y)-(a0-x)*b2)^2
+    //  = (a2*b1-a1*b2)*(b1*x+a1*y+a1*b0-a0*b1)-(b2*x-a2*y+a2*b0-a0*b2)^2
+    //  = -b2^2*x^2+2*a2*b2*x*y-a2^2*y^2
+    //   +(b1*(a2*b1-a1*b2)-2*b2*(a2*b0-a0*b2))*x
+    //   +(a1*(a2*b1-a1*b2)+2*a2*(a2*b0-a0*b2))*y
+    //   +(a2*b1-a1*b2)*(a1*b0-a0*b1)-(a2*b0-a0*b2)^2
+    //  = A*x^2+B*x*y+C*y^2+D*x+E*y+F
+    // 
+    // curve 2: x=c2*u^2+c1*u+c0, y=d2*u^2+d1*u+d0
+    // f(x(u), y(u))
+    //  = A*(c2*u^2+c1*u+c0)^2+B*(c2*u^2+c1*u+c0)*(d2*u^2+d1*u+d0)
+    //   +C*(d2*u^2+d1*u+d0)^2+D*(c2*u^2+c1*u+c0)+E*(d2*u^2+d1*u+d0)+F
+    //  = A*(c2^2*u^4+2*c1*c2*u^3+(2*c0*c2+c1^2)*u^2+2*c0*c1*u+c0^2)
+    //   +B*(c2*d2*u^4+(c2*d1+c1*d2)*u^3+(c2*d0+c0*d2+c1*d1)*u^2+(c1*d0+c0*d1)*u+c0*d0)
+    //   +C*(d2^2*u^4+2*d1*d2*u^3+(2*d0*d2+d1^2)*u^2+2*d0*d1*u+d0^2)
+    //   +D*(c2*u^2+c1*u+c0)+E*(d2*u^2+d1*u+d0)+F
+    //  = (A*c2^2+B*c2*d2+C*d2^2)*u^4
+    //   +(2*A*c1*c2+B*(c2*d1+c1*d2)+2*C*d1*d2)*u^3
+    //   +(A*(2*c0*c2+c1^2)+B*(c2*d0+c0*d2+c1*d1)+C*(2*d0*d2+d1^2)+D*c2+E*d2)*u^2
+    //   +(2*A*c0*c1+B*(c1*d0+c0*d1)+2*C*d0*d1+D*c1+E*d1)*u
+    //   +(A*c0^2+B*c0*d0+C*d0^2+D*c0+E*d0+F)
+
+
+  // curve 1: x=a3*t^3+a2*t^2+a1*t+a0, y=b3*t^3+b2*t^2+b1*t+b0
+
+
+
+
+
+
+
+
+
+  //  = c32*(z3+c30+c21)*(z1+c10)
+  //    + c32*(z2+c20)^2
+  //    + 2*c31*(z3+c30)*(z2+c20)
+  //    - c31^2*(z1+c10)
+  //    - (z3+c30)^2*(z3+c30+c21)
+  //  = c32*(z3*z1+c10*z3+(c30+c21)*z1+c21*c10)
+  //    + c32*(z2^2+2*c20*z2+c20^2)
+  //    + 2*c31*(z3*z2+c20*z3+c30*z2+c30*c20)
+  //    - c31^2*(z1+c10)
+  //    - (z3^2+2*c30*z3+c30^2)*(z3+c30+c21)
+
+
+
+
+  // -------old-----------
+  // f(x, y)
+  //   |c32           c31               b3*x-a3*y+c30|
+  // = |c31           b3*x-a3*y+c30+c21 b2*x-a2*y+c20|
+  //   |b3*x-a3*y+c30 b2*x-a2*y+c20     b1*x-a1*y+c10|
+  // = c32*((b3*x-a3*y+c30+c21)*(b1*x-a1*y+c10)-(b2*x-a2*y+c20)^2)
+  //  -c31*(c31*(b1*x-a1*y+c10)-(b2*x-a2*y+c20)*(b3*x-a3*y+c30))
+  //  +(b3*x-a3*y+c30)*(c31*(b2*x-a2*y+c20)-(b3*x-a3*y+c30+c21)*(b3*x-a3*y+c30))
+  // = c32*((b3*x-a3*y+c30+c21)*(b1*x-a1*y+c10)-(b2*x-a2*y+c20)^2)
+  //  -c31*(c31*(b1*x-a1*y+c10)-(b2*x-a2*y+c20)*(b3*x-a3*y+c30))
+  //  +c31*(b3*x-a3*y+c30)*(b2*x-a2*y+c20)
+  //  -(b3*x-a3*y+c30+c21)*(b3*x-a3*y+c30)^2
+  //
+  // c32*((b3*x-a3*y+c30+c21)*(b1*x-a1*y+c10)-(b2*x-a2*y+c20)^2)
+  // = (c32*(b1*b3-b2^2)*x^2+c32*(-b3*a1-a3*b1+2*a2*b2)*x*y+c32*(a1*a3-a2^2)*y^2
+  //   +c32*(b3*c10+b1*(c30+c21)-2*b2*c20)*x
+  //   +c32*(-a3*c10-a1*(c30+c21)+2*a2*c20)*y
+  //   +c32*((c30+c21)*c10-c20^2))
+  //
+  // -c31*(c31*(b1*x-a1*y+c10)-(b2*x-a2*y+c20)*(b3*x-a3*y+c30))
+  // = (c31*b2*b3*x^2+(-c31)*(a3*b2+a2*b3)*x*y+c31*a2*a3*y^2
+  //    -c31*(c31*b1+b2*c30+b3*c20)*x+c31*(c31*a1-a2*c30-a3*c20)*y
+  //    -c31*(c31*c10+c20*c30))
+  //
+  // (b3*x-a3*y+c30)*c31*(b2*x-a2*y+c20)
+  // = (c31*b2*b3*x^2+(-c31)*(a2*b3+a3*b2)*x*y+c31*a2*a3*y^2
+  //    +c31*(b3*c20+b2*c30)*x+(-c31)*(a3*c20+a2*c30)*y+c31*c30*c20)
+  //
+  // the last term:
+  // -(b3*x-a3*y+c30+c21)*(b3*x-a3*y+c30)^2
+  // = -((b3*x-a3*y+c30+c21)*
+  //     (b3^2*x^2-2*a3*b3*x*y+a3^2*y^2+2*b3*c30*x-2*a3*c30*y+c30^2))
+  // = -b3^3*x^3+(a3*b3^2+b3*2*a3*b3)*x^2*y+(-b3*a3^2-a3*2*a3*b3)*x*y^2+a3^3*y^3
+  //   +(-b3^2*(c30+c21)-b3*2*b3*c30)*x^2
+  //   +(2*a3*b3*(c30+c21)+b3*2*a3*c30+a3*2*b3*c30)*x*y
+  //   +(-a3^2*(c30+c21)-a3*2*a3*c30)*y^2
+  //   +(-b3*c30^2-2*b3*c30*(c30+c21))*x
+  //   +(a3*c30^2+2*a3*c30*(c30+c21))*y
+  //   -(c30+c21)*c30^2
+  // = -b3^3*x^3+3*a3*b3^2*x^2*y-3*a3^2*b3*x*y^2+a3^3*y^3
+  //   -b3^2*(3*c30+c21)*x^2+2*a3*b3*(3*c30+c21)*x*y-a3^2*(3*c30+c21)*y^2
+  //   -b3*c30*(3*c30+2*c21)*x+a3*c30*(3*c30+2*c21)*y-(c30+c21)*c30^2
+
+  // f(x, y)
+  // = (c32*(b1*b3-b2^2)*x^2+c32*(-b3*a1-a3*b1+2*a2*b2)*x*y+c32*(a1*a3-a2^2)*y^2
+  //   +c32*(b3*c10+b1*(c30+c21)-2*b2*c20)*x
+  //   +c32*(-a3*c10-a1*(c30+c21)+2*a2*c20)*y
+  //   +c32*((c30+c21)*c10-c20^2))
+  //  +(c31*b2*b3*x^2+(-c31)*(a3*b2+a2*b3)*x*y+c31*a2*a3*y^2
+  //    -c31*(c31*b1+b2*c30+b3*c20)*x+c31*(c31*a1-a2*c30-a3*c20)*y
+  //    -c31*(c31*c10+c20*c30))
+  //  +(c31*b2*b3*x^2+(-c31)*(a2*b3+a3*b2)*x*y+c31*a2*a3*y^2
+  //   +c31*(b3*c20+b2*c30)*x+(-c31)*(a3*c20+a2*c30)*y+c31*c30*c20)
+  //  +(-b3^3*x^3+3*a3*b3^2*x^2*y-3*a3^2*b3*x*y^2+a3^3*y^3
+  //    -b3^2*(3*c30+c21)*x^2+2*a3*b3*(3*c30+c21)*x*y-a3^2*(3*c30+c21)*y^2
+  //    -b3*c30*(3*c30+2*c21)*x+a3*c30*(3*c30+2*c21)*y-(c30+c21)*c30^2)
+  // = -b3^3*x^3+3*a3*b3^2*x^2*y-3*a3^2*b3*x*y^2+a3^3*y^3
+  //  +(c32*(b1*b3-b2^2)+2*c31*b2*b3-b3^2*(3*c30+c21))*x^2
+  //  +(c32*(-b3*a1-a3*b1+2*a2*b2)-2*c31*(a3*b2+a2*b3)+2*a3*b3*(3*c30+c21))*x*y
+  //  +(c32*(a1*a3-a2^2)+2*c31*a2*a3-a3^2*(3*c30+c21))*y^2
+  //  +(c32*(b3*c10+b1*(c30+c21)-2*b2*c20)-c31*(c31*b1+b2*c30+b3*c20)
+  //    +c31*(b3*c20+b2*c30)-b3*c30*(3*c30+2*c21))*x
+  //  +(c32*(-a3*c10-a1*(c30+c21)+2*a2*c20)+c31*(c31*a1-a2*c30-a3*c20)
+  //    -c31*(a3*c20+a2*c30)+a3*c30*(3*c30+2*c21))*y
+  //  +(c32*((c30+c21)*c10-c20^2)-c31*(c31*c10+c20*c30)+c31*c30*c20
+  //    -(c30+c21)*c30^2)
+  // = a*x^3+b*x^2*y+c*x*y^2+d*y^3+e*x^2+f*x*y+g*y^2+h*x+i*y+j
+  //
+  // a = -b3^3
+  // b = 3*a3*b3^2
+  // c = -3*a3^2*b3
+  // d = a3^3
+  // e = c32*(b1*b3-b2^2)+2*c31*b2*b3-b3^2*(3*c30+c21) 
+  // f = c32*(-b3*a1-a3*b1+2*a2*b2)-2*c31*(a3*b2+a2*b3)+2*a3*b3*(3*c30+c21)
+  // g = c32*(a1*a3-a2^2)+2*c31*a2*a3-a3^2*(3*c30+c21)
+  // h = c32*(b3*c10+b1*(c30+c21)-2*b2*c20)-c31*(c31*b1+b2*c30+b3*c20)
+  //     +c31*(b3*c20+b2*c30)-b3*c30*(3*c30+2*c21)
+  // i = c32*(-a3*c10-a1*(c30+c21)+2*a2*c20)+c31*(c31*a1-a2*c30-a3*c20)
+  //     -c31*(a3*c20+a2*c30)+a3*c30*(3*c30+2*c21)
+  // j = c32*((c30+c21)*c10-c20^2)-c31*(c31*c10+c20*c30)+c31*c30*c20
+  //     -(c30+c21)*c30^2
+
+
+  execute: function execute() {
+
+  }
+});
 function binarySearch(mappings, searchIndex, searchValue) {
   // http://en.wikipedia.org/wiki/Binary_search_algorithm
   var iMin = 0, iMax = mappings.length - 1, iMid, midValue;

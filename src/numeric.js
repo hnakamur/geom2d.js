@@ -143,7 +143,7 @@ mix(Polynomial.prototype, {
     var c = this.coefficients, dc = [];
     for (i = 1, degree = this.degree(); i <= degree; ++i)
       dc.push(c[i] * i);
-console.log('derivative: dc=' + JSON.stringify(dc));
+//console.log('derivative: dc=' + JSON.stringify(dc));
     return new Polynomial(dc);
   },
   realRootsBetween: function realRootsBetween(xMin, xMax, epsilon) {
@@ -155,7 +155,7 @@ console.log('derivative: dc=' + JSON.stringify(dc));
     else {
       var deriv = this.derivative();
       var derivRoots = deriv.realRootsBetween(xMin, xMax, epsilon);
-console.log('derivRoots=' + JSON.stringify(derivRoots));
+//console.log('derivRoots=' + JSON.stringify(derivRoots));
       var xs = uniqAndSort([xMin, xMax].concat(derivRoots));
       var n = xs.length;
       var sgnYs = [];
@@ -173,7 +173,7 @@ console.log('derivRoots=' + JSON.stringify(derivRoots));
         if (sgnYs[i] * sgnYs[i + 1] === -1) {
           var finder = new OneRootFinder(f, df);
           var root = finder.findOneRootBetween(xs[i], xs[i + 1], epsilon);
-console.log('findOneRoot iter=' + finder.iter);
+//console.log('findOneRoot iter=' + finder.iter);
           roots.push(root);
         }
       }
@@ -204,36 +204,46 @@ function OneRootFinder(func, derivFunc) {
 mix(OneRootFinder.prototype, {
   calcEpsilonFromMinAndMax: function calcEpsilonFromMinAndMax(xMin, xMax) {
     return MACHINE_EPSILON * (Math.abs(xMin) + Math.abs(xMax)) / 2;
+    //return MACHINE_EPSILON * (Math.abs(this.func(xMin)) + Math.abs(this.func(xMax))) / 2;
   },
   findOneRootBetween: function findOneRootBetween(xMin, xMax, epsilon) {
-console.log('findOneRootBetween(): epsilon=' + epsilon);
-    if (epsilon === undefined)
+//console.log('findOneRootBetween(): epsilon=' + epsilon);
+    var isEpsProvided = epsilon !== undefined;
+    if (!isEpsProvided) {
       epsilon = this.calcEpsilonFromMinAndMax(xMin, xMax);
+//console.log('findOneRootBetween(): calculated epsilon=' + epsilon);
+    }
     var yAtXMin = this.func(xMin);
     if (numberEquals(yAtXMin, 0, epsilon))
       return xMin;
     var yAtXMax = this.func(xMax);
     if (numberEquals(yAtXMax, 0, epsilon))
       return xMax;
-console.log('findOneRootBetween(): yAtXMin=' + yAtXMin + ', yAtXMax=' + yAtXMax);
+//console.log('findOneRootBetween(): yAtXMin=' + yAtXMin + ', yAtXMax=' + yAtXMax);
     var sgnYAtXMin = sgn(yAtXMin), sgnYAtXMax = sgn(yAtXMax);
     if (sgnYAtXMin * sgnYAtXMax >= 0)
       throw new Error('Values at xMin and xMax must have different signs.');
 
     var xNewton, yAtXNewton;
     for (this.iter = 0; this.iter < this.maxIteration; ++this.iter) {
-console.log('findOneRootBetween(): xMin=' + xMin + ', xMax=' + xMax);
+//console.log('findOneRootBetween(): xMin=' + xMin + ', xMax=' + xMax);
       // First, we proceed one step with the bisection method.
       var xMid = (xMin + xMax) / 2, yAtXMid = this.func(xMid);
-console.log('findOneRootBetween(): yAtXMid=' + yAtXMid);
+//console.log('findOneRootBetween(): yAtXMid=' + yAtXMid + ', xMid=' + xMid);
       if (numberEquals(yAtXMid, 0, epsilon))
         return xMid;
+      if (xMid === xMin || xMid === xMax) {
+        if (isEpsProvided)
+          throw new Error('Specified epsilon is too small for this root.');
+        else
+          return Math.abs(yAtXMin) < Math.abs(yAtXMax) ? xMin : xMax;
+      }
 
       if (sgn(yAtXMid) === sgnYAtXMin)
         xMin = xMid;
       else
         xMax = xMid;
-console.log('findOneRootBetween(): after bisection xMin=' + xMin + ', xMax=' + xMax);
+//console.log('findOneRootBetween(): after bisection xMin=' + xMin + ', xMax=' + xMax);
 
       // We use the middle point as the starting point of the Newton method
       // in cases:
@@ -257,10 +267,10 @@ console.log('findOneRootBetween(): after bisection xMin=' + xMin + ', xMax=' + x
       // out of the range determined with the bisection, and hence will
       // be discarded.
       xNewton -= yAtXNewton / this.derivFunc(xNewton);
-console.log('findOneRootBetween(): xNewton=' + xNewton);
+//console.log('findOneRootBetween(): xNewton=' + xNewton);
       if (xMin <= xNewton && xNewton <= xMax) {
         yAtXNewton = this.func(xNewton);
-console.log('findOneRootBetween(): yAtXNewton=' + yAtXNewton);
+//console.log('findOneRootBetween(): yAtXNewton=' + yAtXNewton);
         if (numberEquals(yAtXNewton, 0, epsilon))
           return xNewton;
 

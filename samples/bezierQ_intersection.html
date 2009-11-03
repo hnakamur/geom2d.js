@@ -11,6 +11,7 @@
 <script type="text/javascript" src="../lib/json2.js"></script>
 <script type="text/javascript" src="../src/numeric.js"></script>
 <script type="text/javascript" src="../src/geom2d.js"></script>
+<script type="text/javascript" src="../src/stopwatch.js"></script>
 <script type="text/javascript">
 $(function() {
 
@@ -74,6 +75,12 @@ $(function() {
 
       console.log('i=' + i + ', offset=' + p.subtract(q).length());
     }
+
+    var sw = new Stopwatch();
+    var elapsed = sw.measure(10, function() {
+      var tPairs = bezier1.tPairsAtIntersections(bezier2);
+    });
+    console.log('elapsed=' + elapsed);
   }
 
 	$('#svg1').svg({onLoad: drawInitial});

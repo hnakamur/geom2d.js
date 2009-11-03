@@ -51,23 +51,16 @@ $(function() {
 
     var bezier1 = drawBezier(svg, cp1);
     var bezier2 = drawBezier(svg, cp2);
-    var lineTolerance = 1e-10, pointTolerance = 1e-9;
-    //var lineTolerance = 1e-9, pointTolerance = 1e-8;
-    //var lineTolerance = 1e-9, pointTolerance = 1e-7;
-    //var lineTolerance = 1e-7, pointTolerance = 1e-6;
-    var points = geom2d.BezierIntersectionBBoxAlgorithm.execute(
-      bezier1, bezier2, pointTolerance, lineTolerance);
-    for (var i = 0, n = points.length; i < n; ++i) {
-      drawPoint(svg, points[i], '#000');
-    }
-console.log('points.length=' + points.length);
 
-    var sw = new Stopwatch();
-    var elapsed = sw.measure(10, function() {
-      var points = geom2d.BezierIntersectionBBoxAlgorithm.execute(
-        bezier1, bezier2, pointTolerance, lineTolerance);
-    });
-    console.log('elapsed=' + elapsed);
+    var bezier = bezier2;
+    var f = bezier.toImplicitFunction();
+    for (var i = 0, n = 20; i <= n; ++i) {
+      var t = i / n;
+      var p = bezier.pointAtT(t);
+      drawPoint(svg, p, '#f00');
+      var fi = f(p.x, p.y);
+      console.log('i=' + i + ', fi=' + fi);
+    }
   }
 
 	$('#svg1').svg({onLoad: drawInitial});
